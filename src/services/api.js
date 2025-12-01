@@ -1,95 +1,58 @@
-const API_URL = import.meta.env.VITE_API_URL;
+import axios from 'axios';
 
-const defaultHeaders = () => ({
-  'Content-Type': 'application/json',
+// Cấu hình URL: Ưu tiên lấy từ môi trường, nếu không có thì dùng localhost
+const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000/api';
+
+const api = axios.create({
+  baseURL: API_URL,
+  headers: {
+    'Content-Type': 'application/json',
+  },
 });
 
-const handleResponse = async (response) => {
-  const data = await response.json().catch(() => ({}));
-  if (!response.ok) {
-    const message = data?.message || 'Đã có lỗi xảy ra. Vui lòng thử lại.';
-    throw new Error(message);
+// Xử lý phản hồi để trả về data sạch hoặc ném lỗi
+api.interceptors.response.use(
+  (response) => response,
+  (error) => {
+    // Log lỗi ra console để dễ debug
+    const errorMessage = error.response?.data?.message || error.message || 'Lỗi kết nối.';
+    console.error("API Error:", errorMessage);
+    return Promise.reject(new Error(errorMessage));
   }
-  return data;
+);
+
+// --- CÁC HÀM GỌI API ---
+
+// 1. Lấy thông tin sinh viên
+// Backend: GET /api/students/:mssv
+export const getStudentById = async (mssv) => {
+  // Sử dụng encodeURIComponent để đảm bảo MSSV có ký tự đặc biệt không gây lỗi URL
+  const response = await api.get(`/students/${encodeURIComponent(mssv)}`);
+  return response.data;
 };
 
-const buildUrl = (path) => {
-  // SỬA LỖI: Thêm fallback về localhost nếu chưa cấu hình .env để tránh sập app
-  const baseUrl = API_URL || 'http://localhost:5000/api';
-  const base = baseUrl.replace(/\/+$/, '');
-  const suffix = path.startsWith('/') ? path : `/${path}`;
-  return `${base}${suffix}`;
+// 2. Gửi mã OTP (MỚI) - Khắc phục lỗi thiếu hàm này
+// Backend: POST /api/registrations/send-otp
+export const sendOtp = async (payload) => {
+  const response = await api.post('/registrations/send-otp', payload);
+  return response.data;
 };
 
-const request = async (path, options = {}) => {
-  const response = await fetch(buildUrl(path), options);
-  return handleResponse(response);
+// 3. Đăng ký thi (Gửi kèm OTP)
+// Backend: POST /api/registrations
+export const registerForExam = async (payload) => {
+  const response = await api.post('/registrations', payload);
+  return response.data;
 };
 
-// --- API METHODS ---
-
-export const getStudentById = (mssv) =>
-  // Lưu ý: Backend tìm theo path param hoặc query param tuỳ setup.
-  // Ở đây giả định Backend route là /students/:mssv (như cấu hình server.js cũ)
-  // Nếu Backend dùng query ?masv=... thì sửa lại dòng dưới.
-  request(`/students/${encodeURIComponent(mssv)}`, {
-    method: 'GET',
-    headers: defaultHeaders(),
-  });
-
-export const registerForExam = (payload) =>
-  // SỬA LỖI: Endpoint đúng là /registrations (khớp với server.js)
-  request('/registrations', {
-    method: 'POST',
-    headers: defaultHeaders(),
-    body: JSON.stringify(payload),
-  });
-
-// THÊM MỚI: Hàm gửi OTP
-export const sendOtp = (payload) =>
-  request('/registrations/send-otp', {
-    method: 'POST',
-    headers: defaultHeaders(),
-    body: JSON.stringify(payload),
-  });
-
+// --- CÁC HÀM ADMIN (Giữ nguyên nếu cần) ---
 export const adminLogin = async (credentials) => {
-  const data = await request('/admin/login', {
-    method: 'POST',
-    headers: defaultHeaders(),
-    body: JSON.stringify(credentials),
-  });
-
-  if (data?.token) {
-    localStorage.setItem('exam_token', data.token);
+  const response = await api.post('/admin/login', credentials);
+  if (response.data?.token) {
+    localStorage.setItem('exam_token', response.data.token);
   }
-  return data;
+  return response.data;
 };
 
-const authHeaders = () => {
-  const token = localStorage.getItem('exam_token');
-  if (!token) return defaultHeaders();
-  return {
-    ...defaultHeaders(),
-    Authorization: `Bearer ${token}`,
-  };
-};
-
-export const getAdminStudents = () =>
-  request('/admin/students', {
-    method: 'GET',
-    headers: authHeaders(),
-  });
-
-export const getAdminSessions = () =>
-  request('/admin/sessions', {
-    method: 'GET',
-    headers: authHeaders(),
-  });
-
-export const createAdminSession = (payload) =>
-  request('/admin/sessions', {
-    method: 'POST',
-    headers: authHeaders(),
-    body: JSON.stringify(payload),
-  });
+// Export default object nếu muốn dùng kiểu "api.get..."
+export default api;
