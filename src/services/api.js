@@ -14,9 +14,10 @@ const handleResponse = async (response) => {
 };
 
 const buildUrl = (path) => {
-  // SỬA LỖI: Thêm fallback về localhost nếu chưa cấu hình .env để tránh sập app
-  const baseUrl = API_URL || 'http://localhost:5000/api';
-  const base = baseUrl.replace(/\/+$/, '');
+  if (!API_URL) {
+    throw new Error('Thiếu cấu hình VITE_API_URL. Vui lòng kiểm tra file .env');
+  }
+  const base = API_URL.replace(/\/+$/, '');
   const suffix = path.startsWith('/') ? path : `/${path}`;
   return `${base}${suffix}`;
 };
@@ -26,32 +27,27 @@ const request = async (path, options = {}) => {
   return handleResponse(response);
 };
 
-// --- API METHODS ---
-
 export const getStudentById = (mssv) =>
-  // Lưu ý: Backend tìm theo path param hoặc query param tuỳ setup.
-  // Ở đây giả định Backend route là /students/:mssv (như cấu hình server.js cũ)
-  // Nếu Backend dùng query ?masv=... thì sửa lại dòng dưới.
-  request(`/students/${encodeURIComponent(mssv)}`, {
+  request(`/students?masv=${encodeURIComponent(mssv)}`, {
     method: 'GET',
     headers: defaultHeaders(),
   });
 
 export const registerForExam = (payload) =>
-  // SỬA LỖI: Endpoint đúng là /registrations (khớp với server.js)
-  request('/registrations', {
+  request('/register', {
     method: 'POST',
     headers: defaultHeaders(),
     body: JSON.stringify(payload),
   });
 
-// THÊM MỚI: Hàm gửi OTP
-export const sendOtp = (payload) =>
-  request('/registrations/send-otp', {
-    method: 'POST',
+// 4. [MỚI] Lấy đợt thi đang mở (Active)
+// Backend cần route: GET /exam-rounds/active
+export const getActiveExamRound = () => {
+  return request('/exam-rounds/active', {
+    method: 'GET',
     headers: defaultHeaders(),
-    body: JSON.stringify(payload),
   });
+};
 
 export const adminLogin = async (credentials) => {
   const data = await request('/admin/login', {
@@ -92,4 +88,10 @@ export const createAdminSession = (payload) =>
     method: 'POST',
     headers: authHeaders(),
     body: JSON.stringify(payload),
+  });
+
+export const getAdminRegistrations = () =>
+  request('/admin/registrations', {
+    method: 'GET',
+    headers: authHeaders(),
   });

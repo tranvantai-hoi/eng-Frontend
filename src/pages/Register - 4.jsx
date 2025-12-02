@@ -38,8 +38,6 @@ const Register = () => {
   // Session State
   const [activeRound, setActiveRound] = useState(null);
   const [roundLoading, setRoundLoading] = useState(false);
-  // Thêm biến này để lưu nội dung lỗi cụ thể của đợt thi
-  const [roundError, setRoundError] = useState('');
 
   const navigate = useNavigate();
 
@@ -47,48 +45,27 @@ const Register = () => {
   useEffect(() => {
     const fetchActiveRound = async () => {
       setRoundLoading(true);
-      setRoundError(''); // Reset lỗi cũ
       try {
         const res = await getActiveExamRound();
-        console.log("Active Round Response:", res); // Log kiểm tra
+        
+        // Xử lý dữ liệu trả về (Object hoặc Array)
+        // Controller của bạn trả về { success: true, data: { ... } } hoặc { ... }
+        const roundData = Array.isArray(res) ? res[0] : (res.data || res);
 
-        // Xử lý dữ liệu trả về linh hoạt hơn
-        let roundData = null;
+        // Ưu tiên lấy cột 'id' như bạn yêu cầu
+        const roundId = roundData?.id;
 
-        if (Array.isArray(res)) {
-            roundData = res[0];
-        } else if (res && res.data) {
-            roundData = Array.isArray(res.data) ? res.data[0] : res.data;
-        } else {
-            roundData = res;
-        }
-
-        // Kiểm tra null/undefined
-        if (!roundData) {
-            setRoundError("Không tìm thấy đợt thi nào đang mở (Data rỗng).");
-            return;
-        }
-
-        // Tìm ID (Ưu tiên id, fallback sang _id, MaDot)
-        const roundId = roundData.id || roundData._id || roundData.MaDot;
-
-        if (roundId) {
+        if (roundData && roundId) {
           setActiveRound({
             id: roundId,
             name: roundData.name || roundData.TenDot || 'Đợt thi chính thức',
             date: roundData.date || roundData.NgayThi
           });
+          // Tự động chọn vào form
           setFormData(prev => ({ ...prev, sessionId: roundId }));
-        } else {
-            console.warn("Data thiếu ID:", roundData);
-            const debugStr = JSON.stringify(roundData);
-            throw new Error(`Dữ liệu thiếu cột ID. Nội dung: ${debugStr}`);
         }
       } catch (err) {
         console.error("Lỗi lấy đợt thi active:", err);
-        let msg = err.message;
-        if (msg === 'Failed to fetch') msg = 'Lỗi kết nối Server (Kiểm tra xem Backend có chạy không).';
-        setRoundError(msg);
       } finally {
         setRoundLoading(false);
       }
@@ -226,10 +203,6 @@ const Register = () => {
     }
   };
 
-  // Tính toán điều kiện enable nút đăng ký
-  // Phải có đợt thi Active VÀ đã tìm thấy SV VÀ đã xác minh Email
-  const canRegister = activeRound && studentLoaded && isEmailVerified;
-
   return (
     <div className="max-w-5xl mx-auto py-10 px-4">
       <div className="text-center mb-10">
@@ -252,7 +225,7 @@ const Register = () => {
                             <Input label="Nhập Mã số sinh viên (MSSV)" name="mssv" value={formData.mssv} onChange={handleChange} required placeholder="VD: 20123456" disabled={studentLoaded} />
                         </div>
                         {studentLoaded ? (
-                            <button onClick={() => { setStudentLoaded(false); setIsEmailVerified(false); setFormData(initialForm); }} className="h-[42px] px-4 bg-gray-100 text-gray-600 font-medium rounded-lg hover:bg-gray-200 transition-colors">Tìm lại</button>
+                            <button onClick={() => { setStudentLoaded(false); setIsEmailVerified(false); setFormData(initialForm); }} className="h-[42px] px-4 bg-gray-100 text-gray-600 font-medium rounded-lg hover:bg-gray-200">Tìm lại</button>
                         ) : (
                             <button type="button" onClick={handleLookup} disabled={loadingStudent || !formData.mssv} className="h-[42px] px-6 bg-blue-600 text-white font-medium rounded-lg hover:bg-blue-700 disabled:opacity-50 min-w-[120px]">
                                 {loadingStudent ? 'Đang tìm...' : 'Tra cứu'}
@@ -270,7 +243,7 @@ const Register = () => {
                 </div>
             </div>
 
-            {/* BƯỚC 2: XÁC MINH EMAIL & SĐT */}
+            {/* BƯỚC 2: XÁC MINH EMAIL */}
             <div className={`bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden transition-opacity duration-300 ${!studentLoaded ? 'opacity-50 pointer-events-none' : 'opacity-100'} ${isEmailVerified ? 'border-l-4 border-l-green-500' : 'border-l-4 border-l-yellow-500'}`}>
                 <div className="bg-slate-50 px-6 py-3 border-b border-slate-100 flex justify-between items-center">
                     <h3 className="font-bold text-slate-700">Bước 2: Xác minh liên hệ</h3>
@@ -308,22 +281,14 @@ const Register = () => {
             </div>
 
             {/* BƯỚC 3: CHỌN ĐỢT THI */}
-            <div className={`bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden transition-opacity duration-300 ${!isEmailVerified ? 'opacity-50 pointer-events-none' : 'opacity-100'} ${formData.sessionId ? 'border-l-4 border-l-green-500' : 'border-l-4 border-l-purple-500'}`}>
+            <div className={`bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden transition-opacity duration-300 ${!isEmailVerified ? 'opacity-50 pointer-events-none' : 'opacity-100'} ${activeRound ? 'border-l-4 border-l-green-500' : 'border-l-4 border-l-gray-300'}`}>
                 <div className="bg-slate-50 px-6 py-3 border-b border-slate-100 flex justify-between items-center">
-                    <h3 className="font-bold text-slate-700">Bước 3: Chọn đợt thi</h3>
-                    {formData.sessionId && <span className="text-green-600 text-xs font-bold bg-green-100 px-2 py-1 rounded">Đã chọn</span>}
+                    <h3 className="font-bold text-slate-700">Bước 3: Xác nhận đợt thi</h3>
+                    {activeRound && <span className="text-green-600 text-xs font-bold bg-green-100 px-2 py-1 rounded">Đang mở</span>}
                 </div>
                 <div className="p-6">
                     {roundLoading ? (
                         <p className="text-slate-500 text-sm">Đang tải thông tin đợt thi...</p>
-                    ) : roundError ? (
-                        <div className="bg-red-50 border border-red-200 rounded-lg p-4">
-                            <h4 className="text-red-700 font-bold flex items-center mb-1">
-                                <i className="fas fa-bug mr-2"></i> Lỗi tìm đợt thi:
-                            </h4>
-                            <p className="text-sm text-red-600 font-mono break-all whitespace-pre-wrap">{roundError}</p>
-                            <button onClick={() => window.location.reload()} className="mt-3 text-xs bg-red-100 text-red-700 px-3 py-1 rounded hover:bg-red-200 font-medium">Tải lại trang</button>
-                        </div>
                     ) : activeRound ? (
                         <div className="bg-green-50 border border-green-200 rounded-lg p-4 flex items-center justify-between">
                             <div>
@@ -333,8 +298,8 @@ const Register = () => {
                             <div className="bg-green-100 text-green-800 text-xs font-bold px-3 py-1 rounded-full uppercase tracking-wide">Đã chọn tự động</div>
                         </div>
                     ) : (
-                        <div className="text-center py-4 bg-slate-50 rounded-lg border border-dashed border-slate-300">
-                            <p className="text-slate-500">Hiện chưa có đợt thi nào được mở.</p>
+                        <div className="text-center py-6 bg-slate-50 rounded-lg border border-dashed border-slate-300">
+                            <p className="text-slate-500">Hiện tại không có đợt thi nào đang mở đăng ký.</p>
                         </div>
                     )}
                 </div>
@@ -343,11 +308,7 @@ const Register = () => {
             {/* SUBMIT */}
             <div className={`transition-opacity duration-300 ${activeRound ? 'opacity-100' : 'opacity-50 pointer-events-none'}`}>
                 {error && <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-lg mb-4 font-medium">{error}</div>}
-                <button 
-                    onClick={handleSubmit} 
-                    disabled={submitLoading || !canRegister} // Sử dụng điều kiện canRegister mới
-                    className="w-full bg-gradient-to-r from-blue-600 to-indigo-700 hover:from-blue-700 hover:to-indigo-800 text-white font-bold py-4 rounded-xl shadow-lg transform transition hover:scale-[1.01] active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed"
-                >
+                <button onClick={handleSubmit} disabled={submitLoading || !activeRound} className="w-full bg-gradient-to-r from-blue-600 to-indigo-700 hover:from-blue-700 hover:to-indigo-800 text-white font-bold py-4 rounded-xl shadow-lg transform transition hover:scale-[1.01] active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed">
                     {submitLoading ? 'Đang xử lý đăng ký...' : 'XÁC NHẬN ĐĂNG KÝ THI'}
                 </button>
             </div>
