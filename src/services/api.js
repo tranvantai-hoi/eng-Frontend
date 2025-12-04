@@ -27,6 +27,8 @@ const request = async (path, options = {}) => {
   return handleResponse(response);
 };
 
+// --- PUBLIC APIS (Sinh viên) ---
+
 export const getStudentById = (mssv) =>
   request(`/students?masv=${encodeURIComponent(mssv)}`, {
     method: 'GET',
@@ -34,11 +36,29 @@ export const getStudentById = (mssv) =>
   });
 
 export const registerForExam = (payload) =>
-  request('/register', {
+  request('/registrations/register', {
     method: 'POST',
     headers: defaultHeaders(),
     body: JSON.stringify(payload),
   });
+
+// [MỚI] Hàm lấy đợt thi đang Active
+// Lưu ý: Đường dẫn này phải khớp với Backend (ví dụ: /exam-rounds/active hoặc /examRoundRoutes/getRoundActive)
+export const getActiveExamRound = () =>
+  request('/exam-rounds/active', {
+    method: 'GET',
+    headers: defaultHeaders(),
+  });
+
+// [MỚI] Hàm gửi OTP (Để thay thế đoạn Mockup trong Register.jsx khi cần)
+export const sendOtp = (payload) =>
+  request('/otp/send-otp', {
+    method: 'POST',
+    headers: defaultHeaders(),
+    body: JSON.stringify(payload),
+  });
+
+// --- ADMIN APIS (Quản trị viên) ---
 
 export const adminLogin = async (credentials) => {
   const data = await request('/admin/login', {
