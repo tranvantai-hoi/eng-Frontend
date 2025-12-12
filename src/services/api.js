@@ -51,8 +51,8 @@ export const getActiveExamRound = () =>
   });
 
 // [MỚI] Hàm gửi OTP (Để thay thế đoạn Mockup trong Register.jsx khi cần)
-export const sendOtp = (payload) =>
-  request('/otp/send-otp', {
+export const createOtp = (payload) =>
+  request('/otp/create-otp', {
     method: 'POST',
     headers: defaultHeaders(),
     body: JSON.stringify(payload),

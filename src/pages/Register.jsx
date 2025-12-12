@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import Input from '../components/Input.jsx';
 // Import API
-import { getStudentById, registerForExam, getActiveExamRound, sendOtp } from '../services/api.js';
+import { getStudentById, registerForExam, getActiveExamRound, createOtp } from '../services/api.js';
 
 // --- CẤU HÌNH ---
 const STEPS = [
@@ -156,7 +156,7 @@ const Register = () => {
     setMockOtpMessage('');
 
     try {
-        const res = await sendOtp({ email: formData.email });
+        const res = await createOtp({ email: formData.email });
         setIsOtpSent(true);
         // Sửa thông báo ở đây:
         setMockOtpMessage('Mã OTP đã được gửi đến email đăng ký, vui lòng kiểm tra email');
