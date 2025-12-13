@@ -58,6 +58,12 @@ export const createOtp = (payload) =>
     body: JSON.stringify(payload),
   });
 
+  export const verifyOtp = ({ email, otp }) =>
+    request(`/otp/verify-otp?email=${email}&otp=${otp}`, {
+      method: 'GET',
+      headers: defaultHeaders(),
+    });
+
 // --- ADMIN APIS (Quản trị viên) ---
 
 export const adminLogin = async (credentials) => {

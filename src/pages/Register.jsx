@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import Input from '../components/Input.jsx';
 // Import API
-import { getStudentById, registerForExam, getActiveExamRound, createOtp } from '../services/api.js';
+import { getStudentById, registerForExam, getActiveExamRound, createOtp, verifyOtp } from '../services/api.js';
 
 // --- CẤU HÌNH ---
 const STEPS = [
@@ -159,7 +159,7 @@ const Register = () => {
         const res = await createOtp({ email: formData.email });
         setIsOtpSent(true);
         // Sửa thông báo ở đây:
-        setMockOtpMessage('Mã OTP đã được gửi đến email đăng ký, vui lòng kiểm tra email');
+        setMockOtpMessage('Mã OTP đã được gửi đến email '+formData.email+', vui lòng kiểm tra email');
     } catch (err) {
         console.error("Lỗi gửi OTP:", err);
         setError(err.message || 'Gửi mã thất bại. Vui lòng thử lại.');
@@ -168,14 +168,22 @@ const Register = () => {
     }
   };
 
-  const handleVerifyOtp = () => {
+  const handleVerifyOtp = async () => {
       if (!otp || otp.length < 6) {
           setError('Vui lòng nhập đủ 6 số OTP.');
           return;
       }
-      setIsEmailVerified(true);
-      setError('');
-      setMockOtpMessage('');
+      else {
+        try {
+            const res = await verifyOtp({ email: formData.email, otp: otp });
+            setIsEmailVerified(true);
+            setError('');
+            setMockOtpMessage('');
+        } catch (err) {
+            console.error("Lỗi xác thực OTP:", err);
+            setError(err.message || 'Xác thực mã thất bại. Vui lòng thử lại.');
+        }
+      }
   };
 
   const handleNextStep = async () => {
