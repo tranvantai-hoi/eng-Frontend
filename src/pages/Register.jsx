@@ -75,45 +75,32 @@ const Register = () => {
 
   const navigate = useNavigate();
 
-  // --- EFFECTS (Đã sửa logic lấy danh sách đợt thi) ---
+  // --- EFFECTS ---
   useEffect(() => {
     const fetchActiveRounds = async () => {
       setRoundLoading(true);
       try {
         const res = await getActiveExamRound();
-        console.log("API Response Rounds:", res); // Log để kiểm tra dữ liệu trả về
+        console.log("API Response Rounds:", res); 
 
         let data = [];
-        
-        // Logic bóc tách dữ liệu kỹ càng hơn để tìm Array
         if (Array.isArray(res)) {
-            // Trường hợp 1: API trả về trực tiếp mảng [ {...}, {...} ]
             data = res;
         } else if (res && Array.isArray(res.data)) { 
-            // Trường hợp 2: API trả về { data: [Array] } (Thường gặp ở Axios hoặc Backend chuẩn)
             data = res.data;
         } else if (res && Array.isArray(res.result)) {
-            // Trường hợp 3: API trả về { result: [Array] }
             data = res.result;
         } else if (res && Array.isArray(res.items)) {
-            // Trường hợp 4: API trả về { items: [Array] }
             data = res.items;
         } else if (res && res.data) {
-             // Trường hợp 5: Fallback nếu res.data là object đơn lẻ (chỉ có 1 đợt)
              data = [res.data];
         } else {
-             // Trường hợp 6: Fallback nếu res là object đơn lẻ
              data = [res];
         }
 
-        // Lọc lại dữ liệu để đảm bảo object hợp lệ (phải có ID hoặc Mã đợt)
-        // Điều này giúp loại bỏ các object rác nếu quá trình bóc tách ở trên bị sai
         const validRounds = data.filter(r => r && (r.id || r._id || r.MaDot));
-        
         setActiveRounds(validRounds);
 
-        // Chỉ tự động chọn nếu danh sách CHỈ CÓ 1 đợt. 
-        // Nếu có nhiều đợt, để user tự chọn (sessionId ban đầu rỗng)
         if (validRounds.length === 1) {
             const r = validRounds[0];
             setFormData(prev => ({ ...prev, sessionId: r.id || r._id || r.MaDot }));
@@ -295,7 +282,20 @@ const Register = () => {
     }, 1500);
   };
 
-  const selectedRound = activeRounds.find(r => (r.id || r._id || r.MaDot) === formData.sessionId);
+  // --- SỬA LOGIC TÌM ĐỢT THI & KHAI BÁO BIẾN HIỂN THỊ ---
+  
+  // Ép về String để so sánh an toàn (tránh lỗi 1 !== "1")
+  const selectedRound = activeRounds.find(r => String(r.id || r._id || r.MaDot) === String(formData.sessionId));
+  
+  // Tính toán trước các giá trị hiển thị, xử lý nhiều case chữ hoa/thường từ DB
+  const displayRoundName = selectedRound ? (selectedRound.name || selectedRound.TenDot || selectedRound.ten_dot || '') : '';
+  
+  const displayRoundDate = selectedRound ? formatDateDisplay(selectedRound.date || selectedRound.NgayThi || selectedRound.ngay_thi) : '';
+  
+  const displayRoundFee = selectedRound 
+      ? Number(selectedRound.lephi || selectedRound.LePhi || selectedRound.le_phi || selectedRound.fee || 0).toLocaleString('vi-VN') 
+      : '0';
+
   const isPaid = registrationResult?.data?.TrangThai === 'paid' || registrationResult?.data?.TrangThai === 'complete';
 
   // --- MÀN HÌNH SUCCESS ---
@@ -323,11 +323,11 @@ const Register = () => {
                         <>
                             <div className="flex justify-between text-sm">
                                 <span className="text-slate-500">Đợt kiểm tra:</span> 
-                                <span className="font-bold text-blue-700">{selectedRound.name || selectedRound.TenDot}</span>
+                                <span className="font-bold text-blue-700">{displayRoundName}</span>
                             </div>
                             <div className="flex justify-between text-sm">
                                 <span className="text-slate-500">Ngày kiểm tra:</span>
-                                <span className="font-bold text-blue-700">{formatDateDisplay(selectedRound.date || selectedRound.NgayThi)}</span>
+                                <span className="font-bold text-blue-700">{displayRoundDate}</span>
                             </div>
                         </>
                     )}
@@ -520,7 +520,7 @@ const Register = () => {
                                     {activeRounds.map(round => (
                                         <option key={round.id || round._id || round.MaDot} value={round.id || round._id || round.MaDot}>
                                             {/* Hiển thị ngày tháng dạng dd/MM/yyyy */}
-                                            {round.name || round.TenDot} (Ngày kiểm tra: {formatDateDisplay(round.date || round.NgayThi)}) 
+                                            {round.name || round.TenDot || round.ten_dot} (Ngày kiểm tra: {formatDateDisplay(round.date || round.NgayThi || round.ngay_thi)}) 
                                         </option>
                                     ))}
                                 </select>
@@ -534,19 +534,18 @@ const Register = () => {
                                 <div className="mt-6 bg-blue-50 border border-blue-200 rounded-xl p-6 flex flex-col md:flex-row md:items-center justify-between gap-4">
                                     <div>
                                         <h4 className="font-bold text-blue-800 text-lg mb-1">
-                                            {activeRounds.find(r => (r.id || r._id || r.MaDot) === formData.sessionId)?.name || activeRounds.find(r => (r.id || r._id || r.MaDot) === formData.sessionId)?.TenDot}
+                                            {displayRoundName}
                                         </h4>
                                         <p className="text-sm text-blue-600">
                                             <i className="far fa-clock mr-2"></i>
                                             {/* Hiển thị ngày tháng dạng dd/MM/yyyy */}
-                                            Thời gian kiểm tra: <span className="font-bold">{formatDateDisplay(activeRounds.find(r => (r.id || r._id || r.MaDot) === formData.sessionId)?.date || activeRounds.find(r => (r.id || r._id || r.MaDot) === formData.sessionId)?.NgayThi)}</span>
+                                            Thời gian kiểm tra: <span className="font-bold">{displayRoundDate}</span>
                                         </p>
                                     </div>
                                     <div className="bg-white px-4 py-2 rounded-lg shadow-sm text-center border border-blue-100">
                                         <p className="text-xs text-slate-500 uppercase font-bold">Lệ phí kiểm tra</p> 
                                         <p className="text-xl font-bold text-red-600">
-                                            {/* Dùng Number() để đảm bảo tính toán đúng */}
-                                            {selectedRound?.lephi ? Number(selectedRound.lephi).toLocaleString('vi-VN') : '0'} VNĐ
+                                            {displayRoundFee} VNĐ
                                         </p>
                                     </div>
                                 </div>
@@ -579,8 +578,8 @@ const Register = () => {
                                 
                                 {selectedRound && (
                                     <div className="py-2 border-t border-b border-slate-100 my-2">
-                                        <p className="flex justify-between mb-1"><span className="text-slate-500">Đợt kiểm tra:</span> <span className="font-bold text-blue-700">{selectedRound.name || selectedRound.TenDot}</span></p> 
-                                        <p className="flex justify-between"><span className="text-slate-500">Ngày kiểm tra:</span> <span className="font-bold text-blue-700">{formatDateDisplay(selectedRound.date || selectedRound.NgayThi)}</span></p> 
+                                        <p className="flex justify-between mb-1"><span className="text-slate-500">Đợt kiểm tra:</span> <span className="font-bold text-blue-700">{displayRoundName}</span></p> 
+                                        <p className="flex justify-between"><span className="text-slate-500">Ngày kiểm tra:</span> <span className="font-bold text-blue-700">{displayRoundDate}</span></p> 
                                     </div>
                                 )}
                                 
@@ -588,8 +587,7 @@ const Register = () => {
                                     <div className="flex justify-between">
                                         <span className="font-bold text-slate-700">Tổng tiền:</span>
                                         <span className="font-bold text-red-600">
-                                            {/* Dùng Number() để đảm bảo tính toán đúng */}
-                                            {selectedRound?.lephi ? Number(selectedRound.lephi).toLocaleString('vi-VN') : '0'} đ
+                                            {displayRoundFee} đ
                                         </span>
                                     </div>
                                     
