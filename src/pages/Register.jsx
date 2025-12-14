@@ -75,25 +75,45 @@ const Register = () => {
 
   const navigate = useNavigate();
 
-  // --- EFFECTS ---
+  // --- EFFECTS (Đã sửa logic lấy danh sách đợt thi) ---
   useEffect(() => {
     const fetchActiveRounds = async () => {
       setRoundLoading(true);
       try {
         const res = await getActiveExamRound();
+        console.log("API Response Rounds:", res); // Log để kiểm tra dữ liệu trả về
+
         let data = [];
+        
+        // Logic bóc tách dữ liệu kỹ càng hơn để tìm Array
         if (Array.isArray(res)) {
+            // Trường hợp 1: API trả về trực tiếp mảng [ {...}, {...} ]
             data = res;
+        } else if (res && Array.isArray(res.data)) { 
+            // Trường hợp 2: API trả về { data: [Array] } (Thường gặp ở Axios hoặc Backend chuẩn)
+            data = res.data;
+        } else if (res && Array.isArray(res.result)) {
+            // Trường hợp 3: API trả về { result: [Array] }
+            data = res.result;
+        } else if (res && Array.isArray(res.items)) {
+            // Trường hợp 4: API trả về { items: [Array] }
+            data = res.items;
         } else if (res && res.data) {
-            data = Array.isArray(res.data) ? res.data : [res.data];
+             // Trường hợp 5: Fallback nếu res.data là object đơn lẻ (chỉ có 1 đợt)
+             data = [res.data];
         } else {
-            data = [res];
+             // Trường hợp 6: Fallback nếu res là object đơn lẻ
+             data = [res];
         }
 
+        // Lọc lại dữ liệu để đảm bảo object hợp lệ (phải có ID hoặc Mã đợt)
+        // Điều này giúp loại bỏ các object rác nếu quá trình bóc tách ở trên bị sai
         const validRounds = data.filter(r => r && (r.id || r._id || r.MaDot));
+        
         setActiveRounds(validRounds);
 
-        // Nếu chỉ có 1 đợt thi thì tự chọn luôn
+        // Chỉ tự động chọn nếu danh sách CHỈ CÓ 1 đợt. 
+        // Nếu có nhiều đợt, để user tự chọn (sessionId ban đầu rỗng)
         if (validRounds.length === 1) {
             const r = validRounds[0];
             setFormData(prev => ({ ...prev, sessionId: r.id || r._id || r.MaDot }));
@@ -275,7 +295,6 @@ const Register = () => {
     }, 1500);
   };
 
-  // Biến selectedRound sẽ tự động tính lại mỗi khi formData.sessionId thay đổi
   const selectedRound = activeRounds.find(r => (r.id || r._id || r.MaDot) === formData.sessionId);
   const isPaid = registrationResult?.data?.TrangThai === 'paid' || registrationResult?.data?.TrangThai === 'complete';
 
@@ -526,7 +545,7 @@ const Register = () => {
                                     <div className="bg-white px-4 py-2 rounded-lg shadow-sm text-center border border-blue-100">
                                         <p className="text-xs text-slate-500 uppercase font-bold">Lệ phí kiểm tra</p> 
                                         <p className="text-xl font-bold text-red-600">
-                                            {/* Dùng Number() để đảm bảo tính toán đúng, và tự động cập nhật khi đổi round */}
+                                            {/* Dùng Number() để đảm bảo tính toán đúng */}
                                             {selectedRound?.lephi ? Number(selectedRound.lephi).toLocaleString('vi-VN') : '0'} VNĐ
                                         </p>
                                     </div>
