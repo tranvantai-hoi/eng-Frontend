@@ -8,7 +8,7 @@ import { getStudentById, registerForExam, getActiveExamRound, createOtp, verifyO
 const STEPS = [
   { id: 1, title: 'Thông tin sinh viên', icon: 'fa-user-graduate' },
   { id: 2, title: 'Xác thực liên hệ', icon: 'fa-envelope-open-text' },
-  { id: 3, title: 'Chọn đợt kiểm tra', icon: 'fa-calendar-alt' }, // Sửa nội dung
+  { id: 3, title: 'Chọn đợt kiểm tra', icon: 'fa-calendar-alt' }, 
   { id: 4, title: 'Thanh toán', icon: 'fa-credit-card' },
 ];
 
@@ -24,17 +24,25 @@ const initialForm = {
 };
 
 // --- HELPERS ---
+
+// Hàm này giữ nguyên định dạng YYYY-MM-DD để dùng cho input type="date"
 const formatDate = (dateString) => {
   if (!dateString) return '';
   const date = new Date(dateString);
   return isNaN(date.getTime()) ? '' : date.toISOString().split('T')[0];
 };
 
-// Hàm hiển thị ngày đẹp (VD: 20/12/2024)
+// Hàm hiển thị ngày đẹp theo định dạng dd/MM/yyyy
 const formatDateDisplay = (dateString) => {
     if (!dateString) return '...';
     const date = new Date(dateString);
-    return isNaN(date.getTime()) ? dateString : date.toLocaleDateString('vi-VN');
+    if (isNaN(date.getTime())) return dateString;
+    
+    const day = String(date.getDate()).padStart(2, '0');
+    const month = String(date.getMonth() + 1).padStart(2, '0');
+    const year = date.getFullYear();
+    
+    return `${day}/${month}/${year}`;
 };
 
 const Register = () => {
@@ -91,7 +99,7 @@ const Register = () => {
         }
 
       } catch (err) {
-        console.error("Lỗi tải đợt kiểm tra:", err); // Sửa log
+        console.error("Lỗi tải đợt kiểm tra:", err);
       } finally {
         setRoundLoading(false);
       }
@@ -128,7 +136,7 @@ const Register = () => {
         ...prev,
         mssv: data.MaSV || prev.mssv,
         fullName: data.HoTen || data.fullName || '',
-        dob: formatDate(data.NgaySinh || data.dob),
+        dob: formatDate(data.NgaySinh || data.dob), // Giữ formatDate (YYYY-MM-DD) cho input date
         gender: data.GioiTinh || data.gender || '', 
         faculty: data.Lop || data.lop || data.Khoa || data.faculty || '', 
         email: data.email || '', 
@@ -158,7 +166,6 @@ const Register = () => {
     try {
         const res = await createOtp({ email: formData.email });
         setIsOtpSent(true);
-        // Sửa thông báo ở đây:
         setMockOtpMessage('Mã OTP đã được gửi đến email '+formData.email+', vui lòng kiểm tra email');
     } catch (err) {
         console.error("Lỗi gửi OTP:", err);
@@ -196,7 +203,7 @@ const Register = () => {
       }
       
       if (currentStep === 3) {
-          if (!formData.sessionId) return setError("Vui lòng chọn một đợt kiểm tra."); // Sửa nội dung
+          if (!formData.sessionId) return setError("Vui lòng chọn một đợt kiểm tra."); 
           
           setError('');
           setSubmitLoading(true); 
@@ -231,7 +238,7 @@ const Register = () => {
               const msg = err.message || "";
 
               if (msg.includes('đã đăng ký') || msg.includes('already registered')) {
-                  if(window.confirm("Bạn đã có hồ sơ đăng ký cho đợt kiểm tra này. Bạn có muốn chuyển đến bước thanh toán không?")) { // Sửa nội dung
+                  if(window.confirm("Bạn đã có hồ sơ đăng ký cho đợt kiểm tra này. Bạn có muốn chuyển đến bước thanh toán không?")) { 
                       setRegistrationResult({
                           success: true,
                           message: 'Đã có bản đăng ký trước đó',
@@ -282,7 +289,7 @@ const Register = () => {
                 <p className="text-slate-500 mb-8">Hệ thống đã ghi nhận thông tin và thanh toán của bạn.</p>
                 
                 <div className="bg-slate-50 rounded-xl p-6 text-left space-y-3 border border-slate-200 mb-8">
-                    <h3 className="font-bold text-slate-800 mb-3 border-b pb-2">Thông tin dự kiểm tra</h3> {/* Sửa nội dung */}
+                    <h3 className="font-bold text-slate-800 mb-3 border-b pb-2">Thông tin dự kiểm tra</h3>
                     <div className="flex justify-between text-sm">
                         <span className="text-slate-500">Sinh viên:</span>
                         <span className="font-bold text-slate-800">{formData.fullName}</span>
@@ -294,11 +301,11 @@ const Register = () => {
                     {selectedRound && (
                         <>
                             <div className="flex justify-between text-sm">
-                                <span className="text-slate-500">Đợt kiểm tra:</span> {/* Sửa nội dung */}
+                                <span className="text-slate-500">Đợt kiểm tra:</span> 
                                 <span className="font-bold text-blue-700">{selectedRound.name || selectedRound.TenDot}</span>
                             </div>
                             <div className="flex justify-between text-sm">
-                                <span className="text-slate-500">Ngày kiểm tra:</span> {/* Sửa nội dung */}
+                                <span className="text-slate-500">Ngày kiểm tra:</span>
                                 <span className="font-bold text-blue-700">{formatDateDisplay(selectedRound.date || selectedRound.NgayThi)}</span>
                             </div>
                         </>
@@ -326,7 +333,7 @@ const Register = () => {
         
         {/* HEADER */}
         <div className="text-center mb-8">
-          <h1 className="text-3xl font-bold text-blue-900 mb-2 uppercase tracking-wide">Đăng Ký Kiểm Tra Năng Lực Tiếng Anh</h1> {/* Sửa tiêu đề chính */}
+          <h1 className="text-3xl font-bold text-blue-900 mb-2 uppercase tracking-wide">Đăng Ký Kiểm Tra Năng Lực Tiếng Anh</h1>
           <p className="text-slate-500">Hệ thống đăng ký trực tuyến & Thanh toán VNPay</p>
         </div>
 
@@ -462,7 +469,7 @@ const Register = () => {
 
                         <div>
                             <Input label="Số điện thoại liên hệ" name="phone" value={formData.phone} onChange={handleChange} required placeholder="09xx..." />
-                            <p className="text-xs text-slate-500 mt-2 italic">* Số điện thoại dùng để liên hệ khẩn cấp khi có thay đổi lịch kiểm tra.</p> {/* Sửa nội dung */}
+                            <p className="text-xs text-slate-500 mt-2 italic">* Số điện thoại dùng để liên hệ khẩn cấp khi có thay đổi lịch kiểm tra.</p> 
                         </div>
                     </div>
                 </div>
@@ -473,14 +480,14 @@ const Register = () => {
                 <div className="p-8 animate-in fade-in slide-in-from-right-4 duration-500">
                     <h2 className="text-xl font-bold text-slate-800 mb-6 flex items-center">
                         <span className="bg-blue-100 text-blue-600 w-8 h-8 rounded-lg flex items-center justify-center mr-3"><i className="fas fa-calendar-check"></i></span>
-                        Lựa chọn đợt kiểm tra {/* Sửa nội dung */}
+                        Lựa chọn đợt kiểm tra 
                     </h2>
 
                     {roundLoading ? (
-                        <div className="text-center py-10"><i className="fas fa-circle-notch fa-spin text-3xl text-blue-500 mb-3"></i><p className="text-slate-500">Đang tải danh sách đợt kiểm tra...</p></div> // Sửa nội dung
+                        <div className="text-center py-10"><i className="fas fa-circle-notch fa-spin text-3xl text-blue-500 mb-3"></i><p className="text-slate-500">Đang tải danh sách đợt kiểm tra...</p></div>
                     ) : activeRounds.length > 0 ? (
                         <div className="space-y-4">
-                            <label className="block text-sm font-bold text-slate-700 mb-2">Danh sách đợt kiểm tra đang mở:</label> {/* Sửa nội dung */}
+                            <label className="block text-sm font-bold text-slate-700 mb-2">Danh sách đợt kiểm tra đang mở:</label>
                             
                             <div className="relative">
                                 <select 
@@ -488,10 +495,11 @@ const Register = () => {
                                     onChange={(e) => setFormData(prev => ({ ...prev, sessionId: e.target.value }))}
                                     className="block w-full appearance-none rounded-xl border-2 border-slate-300 bg-white py-3 px-4 pr-10 text-slate-700 focus:border-blue-500 focus:outline-none focus:ring-0 font-medium text-lg cursor-pointer hover:border-blue-400 transition-colors"
                                 >
-                                    <option value="">-- Vui lòng chọn đợt kiểm tra --</option> {/* Sửa nội dung */}
+                                    <option value="">-- Vui lòng chọn đợt kiểm tra --</option> 
                                     {activeRounds.map(round => (
                                         <option key={round.id || round._id || round.MaDot} value={round.id || round._id || round.MaDot}>
-                                            {round.name || round.TenDot} (Ngày kiểm tra: {formatDate(round.date || round.NgayThi)}) {/* Sửa nội dung */}
+                                            {/* Sửa: Sử dụng formatDateDisplay (dd/MM/yyyy) */}
+                                            {round.name || round.TenDot} (Ngày kiểm tra: {formatDateDisplay(round.date || round.NgayThi)}) 
                                         </option>
                                     ))}
                                 </select>
@@ -509,12 +517,15 @@ const Register = () => {
                                         </h4>
                                         <p className="text-sm text-blue-600">
                                             <i className="far fa-clock mr-2"></i>
-                                            Thời gian kiểm tra: <span className="font-bold">{formatDate(activeRounds.find(r => (r.id || r._id || r.MaDot) === formData.sessionId)?.date || activeRounds.find(r => (r.id || r._id || r.MaDot) === formData.sessionId)?.NgayThi)}</span> {/* Sửa nội dung */}
+                                            {/* Sửa: Sử dụng formatDateDisplay (dd/MM/yyyy) */}
+                                            Thời gian kiểm tra: <span className="font-bold">{formatDateDisplay(activeRounds.find(r => (r.id || r._id || r.MaDot) === formData.sessionId)?.date || activeRounds.find(r => (r.id || r._id || r.MaDot) === formData.sessionId)?.NgayThi)}</span>
                                         </p>
                                     </div>
                                     <div className="bg-white px-4 py-2 rounded-lg shadow-sm text-center border border-blue-100">
-                                        <p className="text-xs text-slate-500 uppercase font-bold">Lệ phí kiểm tra</p> {/* Sửa nội dung */}
-                                        <p className="text-xl font-bold text-red-600">500.000 VNĐ</p>
+                                        <p className="text-xs text-slate-500 uppercase font-bold">Lệ phí kiểm tra</p> 
+                                        <p className="text-xl font-bold text-red-600">
+                                            {selectedRound?.lephi ? selectedRound.lephi.toLocaleString('vi-VN') : '0'} VNĐ
+                                        </p>
                                     </div>
                                 </div>
                             )}
@@ -522,7 +533,7 @@ const Register = () => {
                     ) : (
                         <div className="text-center py-10 bg-slate-50 rounded-xl border-2 border-dashed border-slate-300">
                             <i className="far fa-calendar-times text-4xl text-slate-300 mb-3"></i>
-                            <p className="text-slate-500 font-medium">Hiện tại không có đợt kiểm tra nào đang mở đăng ký.</p> {/* Sửa nội dung */}
+                            <p className="text-slate-500 font-medium">Hiện tại không có đợt kiểm tra nào đang mở đăng ký.</p> 
                         </div>
                     )}
                 </div>
@@ -546,15 +557,17 @@ const Register = () => {
                                 
                                 {selectedRound && (
                                     <div className="py-2 border-t border-b border-slate-100 my-2">
-                                        <p className="flex justify-between mb-1"><span className="text-slate-500">Đợt kiểm tra:</span> <span className="font-bold text-blue-700">{selectedRound.name || selectedRound.TenDot}</span></p> {/* Sửa nội dung */}
-                                        <p className="flex justify-between"><span className="text-slate-500">Ngày kiểm tra:</span> <span className="font-bold text-blue-700">{formatDateDisplay(selectedRound.date || selectedRound.NgayThi)}</span></p> {/* Sửa nội dung */}
+                                        <p className="flex justify-between mb-1"><span className="text-slate-500">Đợt kiểm tra:</span> <span className="font-bold text-blue-700">{selectedRound.name || selectedRound.TenDot}</span></p> 
+                                        <p className="flex justify-between"><span className="text-slate-500">Ngày kiểm tra:</span> <span className="font-bold text-blue-700">{formatDateDisplay(selectedRound.date || selectedRound.NgayThi)}</span></p> 
                                     </div>
                                 )}
                                 
                                 <div className="pt-2 text-lg">
                                     <div className="flex justify-between">
                                         <span className="font-bold text-slate-700">Tổng tiền:</span>
-                                        <span className="font-bold text-red-600">500.000 đ</span>
+                                        <span className="font-bold text-red-600">
+                                            {selectedRound?.lephi ? selectedRound.lephi.toLocaleString('vi-VN') : '0'} đ
+                                        </span>
                                     </div>
                                     
                                     {/* TRẠNG THÁI THANH TOÁN */}
