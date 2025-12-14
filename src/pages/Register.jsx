@@ -93,6 +93,7 @@ const Register = () => {
         const validRounds = data.filter(r => r && (r.id || r._id || r.MaDot));
         setActiveRounds(validRounds);
 
+        // Nếu chỉ có 1 đợt thi thì tự chọn luôn
         if (validRounds.length === 1) {
             const r = validRounds[0];
             setFormData(prev => ({ ...prev, sessionId: r.id || r._id || r.MaDot }));
@@ -136,7 +137,7 @@ const Register = () => {
         ...prev,
         mssv: data.MaSV || prev.mssv,
         fullName: data.HoTen || data.fullName || '',
-        dob: formatDate(data.NgaySinh || data.dob), // Giữ formatDate (YYYY-MM-DD) cho input date
+        dob: formatDate(data.NgaySinh || data.dob),
         gender: data.GioiTinh || data.gender || '', 
         faculty: data.Lop || data.lop || data.Khoa || data.faculty || '', 
         email: data.email || '', 
@@ -274,6 +275,7 @@ const Register = () => {
     }, 1500);
   };
 
+  // Biến selectedRound sẽ tự động tính lại mỗi khi formData.sessionId thay đổi
   const selectedRound = activeRounds.find(r => (r.id || r._id || r.MaDot) === formData.sessionId);
   const isPaid = registrationResult?.data?.TrangThai === 'paid' || registrationResult?.data?.TrangThai === 'complete';
 
@@ -498,7 +500,7 @@ const Register = () => {
                                     <option value="">-- Vui lòng chọn đợt kiểm tra --</option> 
                                     {activeRounds.map(round => (
                                         <option key={round.id || round._id || round.MaDot} value={round.id || round._id || round.MaDot}>
-                                            {/* Sửa: Sử dụng formatDateDisplay (dd/MM/yyyy) */}
+                                            {/* Hiển thị ngày tháng dạng dd/MM/yyyy */}
                                             {round.name || round.TenDot} (Ngày kiểm tra: {formatDateDisplay(round.date || round.NgayThi)}) 
                                         </option>
                                     ))}
@@ -517,14 +519,15 @@ const Register = () => {
                                         </h4>
                                         <p className="text-sm text-blue-600">
                                             <i className="far fa-clock mr-2"></i>
-                                            {/* Sửa: Sử dụng formatDateDisplay (dd/MM/yyyy) */}
+                                            {/* Hiển thị ngày tháng dạng dd/MM/yyyy */}
                                             Thời gian kiểm tra: <span className="font-bold">{formatDateDisplay(activeRounds.find(r => (r.id || r._id || r.MaDot) === formData.sessionId)?.date || activeRounds.find(r => (r.id || r._id || r.MaDot) === formData.sessionId)?.NgayThi)}</span>
                                         </p>
                                     </div>
                                     <div className="bg-white px-4 py-2 rounded-lg shadow-sm text-center border border-blue-100">
                                         <p className="text-xs text-slate-500 uppercase font-bold">Lệ phí kiểm tra</p> 
                                         <p className="text-xl font-bold text-red-600">
-                                            {selectedRound?.lephi ? selectedRound.lephi.toLocaleString('vi-VN') : '0'} VNĐ
+                                            {/* Dùng Number() để đảm bảo tính toán đúng, và tự động cập nhật khi đổi round */}
+                                            {selectedRound?.lephi ? Number(selectedRound.lephi).toLocaleString('vi-VN') : '0'} VNĐ
                                         </p>
                                     </div>
                                 </div>
@@ -566,7 +569,8 @@ const Register = () => {
                                     <div className="flex justify-between">
                                         <span className="font-bold text-slate-700">Tổng tiền:</span>
                                         <span className="font-bold text-red-600">
-                                            {selectedRound?.lephi ? selectedRound.lephi.toLocaleString('vi-VN') : '0'} đ
+                                            {/* Dùng Number() để đảm bảo tính toán đúng */}
+                                            {selectedRound?.lephi ? Number(selectedRound.lephi).toLocaleString('vi-VN') : '0'} đ
                                         </span>
                                     </div>
                                     
