@@ -35,6 +35,15 @@ export const getStudentById = (mssv) =>
     headers: defaultHeaders(),
   });
 
+// [MỚI] Hàm cập nhật thông tin liên hệ (Email/SĐT)
+// Hàm này sẽ được gọi ở cuối Step 2 trong Register.jsx
+export const updateStudentInfo = (payload) =>
+  request('/students/update-contact', {
+    method: 'POST',
+    headers: defaultHeaders(),
+    body: JSON.stringify(payload),
+  });
+
 export const registerForExam = (payload) =>
   request('/registrations/register', {
     method: 'POST',
@@ -43,14 +52,13 @@ export const registerForExam = (payload) =>
   });
 
 // [MỚI] Hàm lấy đợt thi đang Active
-// Lưu ý: Đường dẫn này phải khớp với Backend (ví dụ: /exam-rounds/active hoặc /examRoundRoutes/getRoundActive)
 export const getActiveExamRound = () =>
   request('/exam-rounds/active', {
     method: 'GET',
     headers: defaultHeaders(),
   });
 
-// [MỚI] Hàm gửi OTP (Để thay thế đoạn Mockup trong Register.jsx khi cần)
+// [MỚI] Hàm gửi OTP 
 export const createOtp = (payload) =>
   request('/otp/create-otp', {
     method: 'POST',
@@ -58,11 +66,11 @@ export const createOtp = (payload) =>
     body: JSON.stringify(payload),
   });
 
-  export const verifyOtp = ({ email, otp }) =>
-    request(`/otp/verify-otp?email=${email}&otp=${otp}`, {
-      method: 'GET',
-      headers: defaultHeaders(),
-    });
+export const verifyOtp = ({ email, otp }) =>
+  request(`/otp/verify-otp?email=${email}&otp=${otp}`, {
+    method: 'GET',
+    headers: defaultHeaders(),
+  });
 
 // --- ADMIN APIS (Quản trị viên) ---
 
