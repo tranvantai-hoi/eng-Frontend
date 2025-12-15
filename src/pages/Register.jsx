@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import Input from '../components/Input.jsx';
 // Import API
-import { getStudentById, registerForExam, getActiveExamRound, createOtp, verifyOtp } from '../services/api.js';
+import { getStudentById, registerForExam, getActiveExamRound, createOtp, verifyOtp, updateStudentInfo } from '../services/api.js';
 
 // --- CẤU HÌNH ---
 const STEPS = [
