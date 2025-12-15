@@ -201,73 +201,107 @@ const Register = () => {
       }
   };
 
-  const handleNextStep = async () => {
-      if (currentStep === 1) {
-          if (!studentLoaded) return setError("Vui lòng tra cứu sinh viên trước.");
-      }
-      if (currentStep === 2) {
-          if (!isEmailVerified) return setError("Vui lòng xác thực Email trước.");
-          if (!formData.phone) return setError("Vui lòng nhập số điện thoại.");
-      }
-      
-      if (currentStep === 3) {
-          if (!formData.sessionId) return setError("Vui lòng chọn một đợt kiểm tra."); 
-          
-          setError('');
-          setSubmitLoading(true); 
-          
-          try {
-              const payload = {
+  // Đừng quên import updateStudentInfo ở trên cùng file nhé
+// import { ..., updateStudentInfo } from '../services/api.js';
+
+const handleNextStep = async () => {
+    // --- STEP 1: TRA CỨU ---
+    if (currentStep === 1) {
+        if (!studentLoaded) return setError("Vui lòng tra cứu sinh viên trước.");
+    }
+
+    // --- STEP 2: XÁC THỰC & CẬP NHẬT THÔNG TIN (SỬA ĐỔI TẠI ĐÂY) ---
+    if (currentStep === 2) {
+        // 1. Validate dữ liệu
+        if (!isEmailVerified) return setError("Vui lòng xác thực Email trước.");
+        if (!formData.phone || formData.phone.trim() === "") return setError("Vui lòng nhập số điện thoại.");
+        
+        setError('');
+        setSubmitLoading(true); // Tận dụng biến loading này để hiển thị spinner trên nút "Tiếp theo"
+
+        try {
+            // 2. Gọi API cập nhật thông tin (Dùng fetch)
+            await updateStudentInfo({
                 mssv: formData.mssv.trim(),
-                sessionId: formData.sessionId,
                 email: formData.email.trim(),
-                phone: formData.phone.trim(),
-                otp: otp,
-                fullName: formData.fullName,
-                dob: formData.dob,
-                gender: formData.gender,
-                faculty: formData.faculty
-              };
+                phone: formData.phone.trim()
+            });
+            
+            // 3. Nếu thành công -> Chuyển bước
+            console.log("Cập nhật thông tin liên hệ thành công!");
+            setCurrentStep(prev => prev + 1);
 
-              const response = await registerForExam(payload);
-              setRegistrationResult(response);
-              
-              const regData = response.data || {};
-              const status = regData.TrangThai || 'pending';
+        } catch (err) {
+            console.error("Lỗi cập nhật:", err);
+            setError(err.message || "Không thể lưu thông tin liên hệ. Vui lòng thử lại.");
+            // Nếu lỗi thì return luôn, KHÔNG chuyển bước
+            return; 
+        } finally {
+            setSubmitLoading(false);
+        }
+        return; // Kết thúc logic Step 2 tại đây
+    }
+    
+    // --- STEP 3: ĐĂNG KÝ THI ---
+    if (currentStep === 3) {
+        if (!formData.sessionId) return setError("Vui lòng chọn một đợt kiểm tra."); 
+        
+        setError('');
+        setSubmitLoading(true); 
+        
+        try {
+            const payload = {
+              mssv: formData.mssv.trim(),
+              sessionId: formData.sessionId,
+              email: formData.email.trim(),
+              phone: formData.phone.trim(),
+              otp: otp,
+              fullName: formData.fullName,
+              dob: formData.dob,
+              gender: formData.gender,
+              faculty: formData.faculty
+            };
 
-              if (status === 'pending') {
-                  setCurrentStep(prev => prev + 1);
-              } else {
-                  setIsSuccess(true); 
-              }
-              
-          } catch (err) {
-              console.error("Lỗi đăng ký:", err);
-              const msg = err.message || "";
+            const response = await registerForExam(payload);
+            setRegistrationResult(response);
+            
+            const regData = response.data || response; // Xử lý tùy theo cấu trúc trả về của fetch/axios cũ
+            const status = regData.TrangThai || regData.status || 'pending';
 
-              if (msg.includes('đã đăng ký') || msg.includes('already registered')) {
-                  if(window.confirm("Bạn đã có hồ sơ đăng ký cho đợt kiểm tra này. Bạn có muốn chuyển đến bước thanh toán không?")) { 
-                      setRegistrationResult({
-                          success: true,
-                          message: 'Đã có bản đăng ký trước đó',
-                          data: { ...formData, TrangThai: 'pending' } 
-                      });
-                      setCurrentStep(prev => prev + 1);
-                  }
-                  return; 
-              }
+            if (status === 'pending') {
+                setCurrentStep(prev => prev + 1);
+            } else {
+                setIsSuccess(true); 
+            }
+            
+        } catch (err) {
+            console.error("Lỗi đăng ký:", err);
+            const msg = err.message || "";
 
-              setError(msg === 'Failed to fetch' ? 'Mất kết nối server.' : msg);
-              return; 
-          } finally {
-              setSubmitLoading(false);
-          }
-          return;
-      }
-      
-      setError('');
-      setCurrentStep(prev => prev + 1);
-  };
+            if (msg.includes('đã đăng ký') || msg.includes('already registered')) {
+                if(window.confirm("Bạn đã có hồ sơ đăng ký cho đợt kiểm tra này. Bạn có muốn chuyển đến bước thanh toán không?")) { 
+                    setRegistrationResult({
+                        success: true,
+                        message: 'Đã có bản đăng ký trước đó',
+                        data: { ...formData, TrangThai: 'pending' } 
+                    });
+                    setCurrentStep(prev => prev + 1);
+                }
+                return; 
+            }
+
+            setError(msg === 'Failed to fetch' ? 'Mất kết nối server.' : msg);
+            return; 
+        } finally {
+            setSubmitLoading(false);
+        }
+        return;
+    }
+    
+    // Step 4 logic (nếu có)
+    setError('');
+    setCurrentStep(prev => prev + 1);
+};
 
   const prevStep = () => {
       setError('');
