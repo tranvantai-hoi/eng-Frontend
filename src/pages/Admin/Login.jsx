@@ -19,10 +19,19 @@ const Login = () => {
     setError('');
     setLoading(true);
     try {
-      await adminLogin(credentials);
-      navigate('/admin/dashboard');
+      const response = await adminLogin(credentials);
+      
+      // Kiểm tra kỹ hơn response trả về từ backend
+      if (response && response.success) {
+         // Chuyển hướng sau khi lưu token (api.js đã lưu token rồi)
+         navigate('/admin/dashboard');
+      } else {
+         setError(response.message || 'Đăng nhập thất bại');
+      }
+
     } catch (err) {
-      setError(err.message);
+      // Hiển thị message lỗi từ backend trả về (thường nằm trong err.message do hàm handleResponse xử lý)
+      setError(err.message || 'Lỗi kết nối server');
     } finally {
       setLoading(false);
     }

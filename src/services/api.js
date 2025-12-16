@@ -75,15 +75,20 @@ export const verifyOtp = ({ email, otp }) =>
 // --- ADMIN APIS (Quản trị viên) ---
 
 export const adminLogin = async (credentials) => {
-  const data = await request('/admin/login', {
+  // SỬA: Gọi vào endpoint /users/login thay vì /users
+  const data = await request('/users/login', {
     method: 'POST',
     headers: defaultHeaders(),
     body: JSON.stringify(credentials),
   });
 
+  // Lưu token vào localStorage nếu đăng nhập thành công
   if (data?.token) {
     localStorage.setItem('exam_token', data.token);
+    // Lưu thêm thông tin user nếu cần hiển thị tên
+    localStorage.setItem('user_info', JSON.stringify(data.user));
   }
+  
   return data;
 };
 
