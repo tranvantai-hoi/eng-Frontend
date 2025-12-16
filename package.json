@@ -10,9 +10,11 @@
     "lint": "echo \"No lint step configured\""
   },
   "dependencies": {
+    "lucide-react": "^0.561.0",
     "react": "^18.3.1",
     "react-dom": "^18.3.1",
-    "react-router-dom": "^6.28.0"
+    "react-router-dom": "^6.28.0",
+    "xlsx": "^0.18.5"
   },
   "devDependencies": {
     "@types/react": "^18.3.10",
@@ -24,10 +26,3 @@
     "vite": "^5.4.8"
   }
 }
-
-
-
-
-
-
-

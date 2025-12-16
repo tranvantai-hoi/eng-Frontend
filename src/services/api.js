@@ -42,6 +42,14 @@ export const updateStudentInfo = (payload) =>
     body: JSON.stringify(payload),
   });
 
+// [MỚI] Gọi API nhập Excel
+export const importStudents = (studentList) =>
+  request('/students/import', {
+    method: 'POST',
+    headers: authHeaders(),
+    body: JSON.stringify(studentList),
+  });
+
 export const registerForExam = (payload) =>
   request('/registrations/register', {
     method: 'POST',
@@ -95,7 +103,7 @@ const authHeaders = () => {
 };
 
 export const getAdminStudents = () =>
-  request('/admin/students', {
+  request('/students', {
     method: 'GET',
     headers: authHeaders(),
   });
