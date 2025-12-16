@@ -125,3 +125,11 @@ export const getAdminRegistrations = () =>
     method: 'GET',
     headers: authHeaders(),
   });
+
+// Thêm vào cuối api.js
+export const changePassword = (payload) =>
+  request('/users/change-password', {
+    method: 'POST',
+    headers: authHeaders(), // Hàm này tự thêm Token vào header
+    body: JSON.stringify(payload),
+  });

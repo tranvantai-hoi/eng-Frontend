@@ -2,20 +2,42 @@ import { useState, useEffect } from 'react';
 import { Routes, Route, Navigate, useLocation } from 'react-router-dom';
 import Navbar from './components/Navbar.jsx';
 
-// Import các trang
+// Import các trang Public
 import Home from './pages/Home.jsx';
 import Register from './pages/Register.jsx';
 import Success from './pages/Success.jsx';
-import Results from './pages/results.jsx'; // [MỚI] Thêm trang kết quả (bạn cần tạo file này hoặc trỏ tạm về Home)
+import Results from './pages/Results.jsx';
 
-// Import Admin pages
+// Import các trang Admin
 import AdminLogin from './pages/Admin/Login.jsx';
 import Dashboard from './pages/Admin/Dashboard.jsx';
 import Students from './pages/Admin/Students.jsx';
 import Sessions from './pages/Admin/Sessions.jsx';
 import Registrations from './pages/Admin/Registrations.jsx';
+// [MỚI] Import trang đổi mật khẩu
+import ChangePassword from './pages/Admin/changepassword.jsx';
 
-// Component bảo vệ Route Admin
+// Helper: Lấy thông tin user an toàn từ localStorage
+const getUserInfo = () => {
+  const userInfoStr = localStorage.getItem('user_info');
+  if (!userInfoStr) return { role: null, fullname: null, username: null };
+  
+  try {
+    const user = JSON.parse(userInfoStr);
+    // Logic ưu tiên hiển thị: Fullname -> Username -> 'User'
+    const displayName = user.fullname || user.username || 'User';
+    
+    return { 
+      role: user.role, 
+      fullname: displayName,
+      username: user.username
+    };
+  } catch (e) {
+    return { role: null, fullname: null, username: null };
+  }
+};
+
+// Component bảo vệ Route Admin (Chưa login thì đá về trang Login)
 const AdminRoute = ({ children }) => {
   const token = typeof window !== 'undefined' ? localStorage.getItem('exam_token') : null;
   if (!token) {
@@ -25,35 +47,45 @@ const AdminRoute = ({ children }) => {
 };
 
 const App = () => {
-  // [MỚI] Quản lý trạng thái login tại App để đồng bộ giữa Navbar và các trang
   const [token, setToken] = useState(localStorage.getItem('exam_token'));
+  
+  // State quản lý thông tin user (Role, Username, Fullname)
+  const [userInfo, setUserInfo] = useState(getUserInfo());
+
   const location = useLocation();
 
-  // Mỗi khi đổi trang, kiểm tra lại token để cập nhật giao diện (nếu vừa login/logout)
   useEffect(() => {
+    // Cập nhật lại state mỗi khi đổi trang (để đồng bộ sau khi login/logout)
     setToken(localStorage.getItem('exam_token'));
+    setUserInfo(getUserInfo());
   }, [location]);
 
-  // [MỚI] Hàm đăng xuất: Xóa token và cập nhật state
   const handleLogout = () => {
     localStorage.removeItem('exam_token');
+    localStorage.removeItem('user_info');
     setToken(null);
+    setUserInfo({ role: null, username: null, fullname: null });
   };
 
   return (
     <div className="flex min-h-screen flex-col bg-slate-50">
-      {/* Truyền props xuống Navbar để điều khiển nút Đăng nhập/Đăng xuất */}
-      <Navbar isLoggedIn={!!token} onLogout={handleLogout} />
+      <Navbar 
+        isLoggedIn={!!token} 
+        role={userInfo.role} 
+        username={userInfo.username} 
+        fullname={userInfo.fullname} 
+        onLogout={handleLogout} 
+      />
       
       <main className="mx-auto w-full max-w-6xl flex-1 px-6 py-8">
         <Routes>
-          {/* Public Routes */}
+          {/* --- PUBLIC ROUTES --- */}
           <Route path="/" element={<Home />} />
           <Route path="/register" element={<Register />} />
           <Route path="/success" element={<Success />} />
-          <Route path="/results" element={<Results />} /> {/* [MỚI] Route cho trang kết quả */}
+          <Route path="/results" element={<Results />} />
 
-          {/* Admin Routes */}
+          {/* --- ADMIN ROUTES --- */}
           <Route path="/admin/login" element={<AdminLogin />} />
           
           <Route
@@ -88,8 +120,18 @@ const App = () => {
               </AdminRoute>
             }
           />
+
+          {/* [MỚI] Route Đổi mật khẩu */}
+          <Route
+            path="/admin/change-password"
+            element={
+              <AdminRoute>
+                <ChangePassword />
+              </AdminRoute>
+            }
+          />
           
-          {/* Fallback route */}
+          {/* Fallback route: Nhập linh tinh thì về trang chủ */}
           <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>
       </main>
