@@ -15,7 +15,7 @@ import {
 } from 'lucide-react';
 
 // --- QUAN TRỌNG: Đã thêm importStudents vào import ---
-import { getAdminStudents, updateStudentInfo, importStudents } from '../../services/api.js';
+import { getAdminStudents, updateStudentFullInfo, importStudents } from '../../services/api.js';
 
 const Students = () => {
   // --- STATE ---
@@ -225,7 +225,7 @@ const Students = () => {
     if (!editingStudent) return;
     
     try {
-      await updateStudentInfo(editingStudent);
+      await updateStudentFullInfo(editingStudent);
       alert('Cập nhật thông tin sinh viên thành công!');
       setIsEditModalOpen(false);
       fetchStudents(); 

@@ -42,6 +42,13 @@ export const updateStudentInfo = (payload) =>
     body: JSON.stringify(payload),
   });
 
+  export const updateStudentFullInfo = (payload) =>
+    request('/students/update', {
+      method: 'POST',
+      headers: defaultHeaders(),
+      body: JSON.stringify(payload),
+    });
+  
 // [MỚI] Gọi API nhập Excel
 export const importStudents = (studentList) =>
   request('/students/import', {
