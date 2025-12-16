@@ -6,7 +6,7 @@ import Navbar from './components/Navbar.jsx';
 import Home from './pages/Home.jsx';
 import Register from './pages/Register.jsx';
 import Success from './pages/Success.jsx';
-import Results from './pages/Results.jsx'; // [MỚI] Thêm trang kết quả (bạn cần tạo file này hoặc trỏ tạm về Home)
+import Results from './pages/results.jsx'; // [MỚI] Thêm trang kết quả (bạn cần tạo file này hoặc trỏ tạm về Home)
 
 // Import Admin pages
 import AdminLogin from './pages/Admin/Login.jsx';
