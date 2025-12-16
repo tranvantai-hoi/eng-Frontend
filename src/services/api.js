@@ -100,18 +100,6 @@ export const getAdminStudents = () =>
     headers: authHeaders(),
   });
 
-export const getAdminSessions = () =>
-  request('/admin/sessions', {
-    method: 'GET',
-    headers: authHeaders(),
-  });
-
-export const createAdminSession = (payload) =>
-  request('/admin/sessions', {
-    method: 'POST',
-    headers: authHeaders(),
-    body: JSON.stringify(payload),
-  });
 
 export const getAdminRegistrations = () =>
   request('/admin/registrations', {
@@ -136,7 +124,7 @@ export const getUsers = () =>
   });
 
 export const createUser = (payload) =>
-  request('/users/Create', {
+  request('/users/create', {
     method: 'POST',
     headers: authHeaders(),
     body: JSON.stringify(payload),
@@ -144,7 +132,36 @@ export const createUser = (payload) =>
 
 export const updateUser = (payload) =>
   request('/users/update', {
-    method: 'PUT',
+    method: 'POST',
     headers: authHeaders(),
     body: JSON.stringify(payload),
   });
+
+//Quản lý đợt thi 
+export const getAdminSessions = () =>
+    request('/exam-rounds/', {
+      method: 'GET',
+      headers: authHeaders(),
+    });
+  
+  export const createAdminSession = (payload) =>
+    request('/exam-rounds/', {
+      method: 'POST',
+      headers: authHeaders(),
+      body: JSON.stringify(payload),
+    });
+  
+  // [MỚI] Cập nhật đợt thi
+  export const updateAdminSession = (id, payload) =>
+    request(`/exam-rounds/${id}`, { 
+      method: 'POST',
+      headers: authHeaders(),
+      body: JSON.stringify(payload),
+    });
+  
+  // [MỚI] Xóa đợt thi
+  export const deleteAdminSession = (id) =>
+    request(`/exam-rounds/${id}`, { 
+      method: 'DELETE',
+      headers: authHeaders(),
+    });
