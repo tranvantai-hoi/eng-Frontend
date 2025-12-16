@@ -9,14 +9,14 @@ const Sessions = () => {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [currentSession, setCurrentSession] = useState(null);
 
-  // Form Data khớp với Backend (ExamRound.js)
+  // Form Data
   const [formData, setFormData] = useState({
     TenDot: '',
     NgayThi: '',
     GioThi: '',
     DiaDiem: '',
     SoLuongToiDa: '',
-    LePhi: '', // Thêm trường LePhi
+    LePhi: '', 
     TrangThai: 'active'
   });
 
@@ -30,7 +30,6 @@ const Sessions = () => {
     setLoading(true);
     try {
       const data = await getAdminSessions();
-      // Backend trả về: { success: true, data: [...] }
       const list = Array.isArray(data.data) ? data.data : [];
       setSessions(list);
     } catch (error) {
@@ -40,19 +39,16 @@ const Sessions = () => {
     }
   };
 
-  // Helper format ngày (YYYY-MM-DD) cho input type="date"
   const formatDateForInput = (isoString) => {
     if (!isoString) return '';
     return new Date(isoString).toISOString().split('T')[0];
   };
 
-  // Helper format ngày hiển thị (DD/MM/YYYY)
   const formatDateDisplay = (isoString) => {
     if (!isoString) return '---';
     return new Date(isoString).toLocaleDateString('vi-VN');
   };
 
-  // Helper format tiền tệ (VND)
   const formatCurrency = (amount) => {
     if (!amount) return '0 VNĐ';
     return new Intl.NumberFormat('vi-VN', { style: 'currency', currency: 'VND' }).format(amount);
@@ -68,7 +64,8 @@ const Sessions = () => {
         GioThi: session.GioThi || '',
         DiaDiem: session.DiaDiem || '',
         SoLuongToiDa: session.SoLuongToiDa || 0,
-        LePhi: session.LePhi || 0, // Load lệ phí từ DB
+        // [SỬA LỖI] Đọc từ session.lephi (do DB trả về chữ thường)
+        LePhi: session.lephi || session.LePhi || 0, 
         TrangThai: session.TrangThai || 'active'
       });
     } else {
@@ -79,7 +76,7 @@ const Sessions = () => {
         GioThi: '',
         DiaDiem: '',
         SoLuongToiDa: '',
-        LePhi: '', // Reset form
+        LePhi: '', 
         TrangThai: 'active'
       });
     }
@@ -96,11 +93,10 @@ const Sessions = () => {
     setMessage({ type: '', text: '' });
 
     try {
-      // Convert SoLuongToiDa và LePhi sang number để gửi API
       const payload = {
         ...formData,
         SoLuongToiDa: parseInt(formData.SoLuongToiDa) || 0,
-        LePhi: parseInt(formData.LePhi) || 0 // Đảm bảo là số
+        LePhi: parseInt(formData.LePhi) || 0
       };
 
       if (currentSession) {
@@ -221,14 +217,16 @@ const Sessions = () => {
                   </div>
                 </div>
 
-                {/* Hiển thị Lệ phí */}
+                {/* Hiển thị Lệ phí - [SỬA LỖI] Đọc từ session.lephi */}
                 <div className="flex items-center gap-3">
                   <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-green-50 text-green-500">
                     <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
                   </div>
                   <div>
                     <p className="text-xs text-slate-400">Lệ phí thi</p>
-                    <p className="font-semibold text-slate-700">{formatCurrency(session.LePhi)}</p>
+                    <p className="font-semibold text-slate-700">
+                        {formatCurrency(session.lephi || session.LePhi)}
+                    </p>
                   </div>
                 </div>
               </div>
