@@ -6,7 +6,7 @@ import Navbar from './components/Navbar.jsx';
 import Home from './pages/Home.jsx';
 import Register from './pages/Register.jsx';
 import Success from './pages/Success.jsx';
-import Results from './pages/results.jsx'; 
+import Results from './pages/Results.jsx'; 
 
 // Import các trang Admin
 import AdminLogin from './pages/Admin/Login.jsx';
@@ -14,8 +14,9 @@ import Dashboard from './pages/Admin/Dashboard.jsx';
 import Students from './pages/Admin/Students.jsx';
 import Sessions from './pages/Admin/Sessions.jsx';
 import Registrations from './pages/Admin/Registrations.jsx';
+import Users from './pages/Admin/Users.jsx';
 // [MỚI] Import trang đổi mật khẩu
-import ChangePassword from './pages/Admin/changepassword.jsx';
+import ChangePassword from './pages/Admin/ChangePassword.jsx';
 
 // Helper: Lấy thông tin user an toàn từ localStorage
 const getUserInfo = () => {
@@ -117,6 +118,15 @@ const App = () => {
             element={
               <AdminRoute>
                 <Registrations />
+              </AdminRoute>
+            }
+          />
+
+          <Route
+            path="/admin/users" 
+            element={
+              <AdminRoute>
+                  <Users />
               </AdminRoute>
             }
           />

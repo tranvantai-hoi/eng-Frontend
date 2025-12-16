@@ -35,8 +35,6 @@ export const getStudentById = (mssv) =>
     headers: defaultHeaders(),
   });
 
-// [MỚI] Hàm cập nhật thông tin liên hệ (Email/SĐT)
-// Hàm này sẽ được gọi ở cuối Step 2 trong Register.jsx
 export const updateStudentInfo = (payload) =>
   request('/students/update-contact', {
     method: 'POST',
@@ -51,14 +49,12 @@ export const registerForExam = (payload) =>
     body: JSON.stringify(payload),
   });
 
-// [MỚI] Hàm lấy đợt thi đang Active
 export const getActiveExamRound = () =>
   request('/exam-rounds/active', {
     method: 'GET',
     headers: defaultHeaders(),
   });
 
-// [MỚI] Hàm gửi OTP 
 export const createOtp = (payload) =>
   request('/otp/create-otp', {
     method: 'POST',
@@ -75,17 +71,14 @@ export const verifyOtp = ({ email, otp }) =>
 // --- ADMIN APIS (Quản trị viên) ---
 
 export const adminLogin = async (credentials) => {
-  // SỬA: Gọi vào endpoint /users/login thay vì /users
   const data = await request('/users/login', {
     method: 'POST',
     headers: defaultHeaders(),
     body: JSON.stringify(credentials),
   });
 
-  // Lưu token vào localStorage nếu đăng nhập thành công
   if (data?.token) {
     localStorage.setItem('exam_token', data.token);
-    // Lưu thêm thông tin user nếu cần hiển thị tên
     localStorage.setItem('user_info', JSON.stringify(data.user));
   }
   
@@ -126,10 +119,32 @@ export const getAdminRegistrations = () =>
     headers: authHeaders(),
   });
 
-// Thêm vào cuối api.js
 export const changePassword = (payload) =>
   request('/users/change-password', {
     method: 'POST',
-    headers: authHeaders(), // Hàm này tự thêm Token vào header
+    headers: authHeaders(),
+    body: JSON.stringify(payload),
+  });
+
+// --- [MỚI] USER MANAGEMENT APIS ---
+// Bổ sung các hàm này để Users.jsx hoạt động
+
+export const getUsers = () =>
+  request('/users', {
+    method: 'GET',
+    headers: authHeaders(),
+  });
+
+export const createUser = (payload) =>
+  request('/users/Create', {
+    method: 'POST',
+    headers: authHeaders(),
+    body: JSON.stringify(payload),
+  });
+
+export const updateUser = (payload) =>
+  request('/users/update', {
+    method: 'PUT',
+    headers: authHeaders(),
     body: JSON.stringify(payload),
   });
