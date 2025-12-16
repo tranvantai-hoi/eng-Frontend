@@ -16,7 +16,7 @@ import Sessions from './pages/Admin/Sessions.jsx';
 import Registrations from './pages/Admin/Registrations.jsx';
 import Users from './pages/Admin/Users.jsx';
 // [MỚI] Import trang đổi mật khẩu
-import ChangePassword from './pages/Admin/ChangePassword.jsx';
+import ChangePassword from './pages/Admin/changepassword.jsx';
 
 // Helper: Lấy thông tin user an toàn từ localStorage
 const getUserInfo = () => {
