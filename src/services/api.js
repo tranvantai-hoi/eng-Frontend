@@ -175,7 +175,7 @@ export const createAdminSession = (payload) =>
 // Cập nhật đợt thi
 export const updateAdminSession = (id, payload) =>
   request(`/exam-rounds/${id}`, { 
-    method: 'POST',
+    method: 'PUT',
     headers: authHeaders(),
     body: JSON.stringify(payload),
   });
@@ -186,3 +186,9 @@ export const deleteAdminSession = (id) =>
     method: 'DELETE',
     headers: authHeaders(),
   });
+// Xóa user
+  export const deleteUser = (id) =>
+    request(`/users/${id}`, { 
+      method: 'DELETE',
+      headers: authHeaders(),
+    });
