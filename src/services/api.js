@@ -76,6 +76,13 @@ export const importStudents = (studentList) =>
         headers: authHeaders(), 
         body: JSON.stringify({ mssv, roundId, status }) 
       });
+
+  export const changeRegistrationround = (mssv, originalRoundId, roundId) => 
+      request('/registrations/changeround', { 
+          method: 'PUT', 
+          headers: authHeaders(), 
+          body: JSON.stringify({mssv, originalRoundId, roundId }) 
+      });
     
   export const deleteRegistration = (mssv, roundId) => 
       request(`/registrations?mssv=${mssv}&roundId=${roundId}`, { 

@@ -22,7 +22,8 @@ import {
   getRegistrationsByRound,
   getRegistrationById,    
   updateRegistrationStatus,
-  deleteRegistration
+  deleteRegistration,
+  changeRegistrationround // Đảm bảo hàm này đã được export trong api.js
 } from '../../services/api.js';
 
 const Registrations = () => {
@@ -57,9 +58,7 @@ const Registrations = () => {
     const fetchSessions = async () => {
       try {
         const res = await getAdminSessions();
-        console.log("Sessions API Response:", res); // Debug log
-
-        // Xử lý dữ liệu trả về linh hoạt (Array hoặc Object có chứa data)
+        
         let roundList = [];
         if (Array.isArray(res)) {
             roundList = res;
@@ -67,21 +66,19 @@ const Registrations = () => {
             roundList = res.data;
         }
 
-        // Sắp xếp giảm dần theo ngày thi để dễ nhìn
+        // Sắp xếp giảm dần theo ngày thi
         roundList.sort((a, b) => new Date(b.NgayThi) - new Date(a.NgayThi));
         
         setSessions(roundList);
 
         // --- LOGIC TÌM ĐỢT THI MẶC ĐỊNH ---
         if (roundList.length > 0) {
-            // 1. Tìm đợt active
+            // Tìm đợt active hoặc gần nhất
             let targetRound = roundList.find(r => r.TrangThai === 'active');
             
-            // 2. Nếu không có active, tìm đợt gần nhất so với hôm nay
             if (!targetRound) {
                 const now = new Date().getTime();
                 let minDiff = Infinity;
-                
                 roundList.forEach(r => {
                     const diff = Math.abs(new Date(r.NgayThi).getTime() - now);
                     if (diff < minDiff) {
@@ -91,10 +88,8 @@ const Registrations = () => {
                 });
             }
 
-            // Set ID đợt thi mặc định (chuyển về string để khớp với value của select)
             if (targetRound) {
                 const roundId = targetRound.id || targetRound.MaDot || targetRound._id;
-                console.log("Default Session ID:", roundId);
                 setSelectedSession(String(roundId));
             }
         }
@@ -116,24 +111,17 @@ const Registrations = () => {
       setRegistrations([]); 
       
       try {
-        console.log(`Fetching registrations for round: ${selectedSession}`);
         const res = await getRegistrationsByRound(selectedSession);
-        console.log("Registrations API Response:", res);
-
-        // Xử lý dữ liệu trả về
         const rawList = Array.isArray(res) ? res : (res.data || []);
         
-        // Map dữ liệu về chuẩn chung để hiển thị
         const safeRegs = rawList.map(r => ({
-            // Ưu tiên các trường từ DB (Postgres thường trả về đúng tên cột)
             mssv: r.MaSV || r.mssv,
             fullName: r.HoTen || r.fullName,
             dob: r.NgaySinh || r.dob,
             gender: r.GioiTinh || r.gender,
-            email: r.email || r.Email, // Chú ý case-sensitive
+            email: r.email || r.Email, 
             phone: r.dienthoai || r.phone || r.DienThoai,
             
-            // Các trường liên quan đến đợt thi
             roundId: r.RoundId || selectedSession,
             roundName: r.TenDot || r.roundName, 
             status: r.TrangThai || r.status || 'pending'
@@ -163,47 +151,81 @@ const Registrations = () => {
 
   // --- HANDLERS ---
   
-  // Mở Modal Sửa (Gọi API chi tiết để đảm bảo dữ liệu mới nhất)
+  // Mở Modal Sửa
   const handleEditClick = async (item) => {
       try {
+          // Gọi API lấy chi tiết để có thông tin mới nhất
           const res = await getRegistrationById(item.mssv, selectedSession);
-          let dataToEdit = item;
+          let dataToEdit = { ...item };
           
           if (res && res.data) {
              const d = res.data;
              dataToEdit = {
-                 ...item,
+                 ...dataToEdit,
                  fullName: d.HoTen || item.fullName,
                  dob: d.NgaySinh || item.dob,
                  status: d.TrangThai || item.status,
-                 roundName: d.TenDot || item.roundName
+                 roundName: d.TenDot || item.roundName,
+                 roundId: item.roundId, // ID đợt thi hiện tại
              };
           }
+          // Lưu lại ID đợt thi gốc để so sánh nếu có thay đổi
+          dataToEdit.originalRoundId = item.roundId;
+          
           setEditingItem(dataToEdit);
           setIsEditModalOpen(true);
       } catch (err) {
-          console.error("Lỗi lấy chi tiết (dùng data local):", err);
-          setEditingItem(item);
+          console.error("Lỗi lấy chi tiết:", err);
+          // Fallback nếu API lỗi
+          setEditingItem({ ...item, originalRoundId: item.roundId });
           setIsEditModalOpen(true);
       }
   };
 
-  // Lưu trạng thái
+  // Lưu thay đổi (Trạng thái & Đợt thi)
   const handleSaveStatus = async () => {
       if (!editingItem) return;
+      
+      const { mssv, roundId, originalRoundId, status } = editingItem;
+
       try {
-          await updateRegistrationStatus(editingItem.mssv, selectedSession, editingItem.status);
+          // 1. Nếu thay đổi đợt thi -> Gọi API chuyển đợt
+          if (String(roundId) !== String(originalRoundId)) {
+              await changeRegistrationround(mssv, originalRoundId, roundId);
+          }
+
+          // 2. Cập nhật trạng thái (Gọi API update status với roundId MỚI)
+          await updateRegistrationStatus(mssv, roundId, status);
           
-          // Cập nhật state cục bộ ngay lập tức
-          setRegistrations(prev => prev.map(item => 
-              (item.mssv === editingItem.mssv)
-              ? { ...item, status: editingItem.status }
-              : item
-          ));
-          
-          alert("Cập nhật trạng thái thành công!");
+          alert("Cập nhật thông tin thành công!");
           setIsEditModalOpen(false);
+
+          // 3. Cập nhật giao diện (Optimistic UI Update)
+          setRegistrations(prev => {
+              // Nếu đợt thi MỚI khác với đợt thi đang chọn xem (selectedSession)
+              // -> Xóa sinh viên khỏi danh sách hiện tại
+              if (String(roundId) !== String(selectedSession)) {
+                  return prev.filter(item => item.mssv !== mssv);
+              }
+
+              // Ngược lại, cập nhật thông tin tại chỗ
+              return prev.map(item => {
+                  if (item.mssv === mssv) {
+                      // Tìm tên đợt thi mới để hiển thị
+                      const newRoundName = sessions.find(s => String(s.id || s.MaDot) === String(roundId))?.TenDot;
+                      return { 
+                          ...item, 
+                          status: status,
+                          roundId: roundId,
+                          roundName: newRoundName || item.roundName
+                      };
+                  }
+                  return item;
+              });
+          });
+
       } catch (err) {
+          console.error(err);
           alert("Lỗi cập nhật: " + (err.message || "Lỗi server"));
       }
   };
@@ -243,7 +265,6 @@ const Registrations = () => {
       XLSX.writeFile(wb, `${currentRoundName}.xlsx`);
   };
 
-  // Badge Status Component
   const StatusBadge = ({ status }) => {
       const isPaid = status === 'paid' || status === 'complete';
       return (
@@ -265,8 +286,8 @@ const Registrations = () => {
       <div className="rounded-3xl bg-gradient-to-r from-violet-600 to-indigo-600 p-8 text-white shadow-xl shadow-indigo-200">
         <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
           <div>
-            <h1 className="text-3xl font-bold">Quản lý Đăng Ký Thi</h1>
-            <p className="text-indigo-100 mt-1">Xem danh sách sinh viên theo từng đợt thi.</p>
+            <h1 className="text-3xl font-bold">Quản lý danh sách đăng ký</h1>
+            <p className="text-indigo-100 mt-1">Xem danh sách sinh viên theo từng đợt.</p>
           </div>
           <button 
              onClick={handleExport}
@@ -281,7 +302,7 @@ const Registrations = () => {
       {/* TOOLBAR */}
       <div className="flex flex-col md:flex-row gap-4 justify-between items-center bg-white p-5 rounded-2xl shadow-sm border border-slate-100">
          
-         {/* SELECT ROUND (Quan trọng) */}
+         {/* SELECT ROUND */}
          <div className="flex items-center gap-3 w-full md:w-auto flex-1">
             <div className="flex items-center gap-2 text-slate-500 font-medium whitespace-nowrap">
                 <ListFilter size={20} />
@@ -395,7 +416,7 @@ const Registrations = () => {
                                     <button 
                                         onClick={() => handleEditClick(item)}
                                         className="p-2 text-violet-600 hover:bg-violet-50 rounded-lg transition-colors border border-transparent hover:border-violet-100"
-                                        title="Sửa trạng thái"
+                                        title="Chỉnh sửa"
                                     >
                                         <Edit size={18} />
                                     </button>
@@ -428,7 +449,7 @@ const Registrations = () => {
             <div className="w-full max-w-md rounded-2xl bg-white shadow-2xl overflow-hidden animate-zoom-in">
                 <div className="bg-violet-50 px-6 py-4 border-b border-violet-100 flex justify-between items-center">
                     <h3 className="font-bold text-violet-900 flex items-center gap-2">
-                        <Edit size={18} /> Cập nhật trạng thái
+                        <Edit size={18} /> Cập nhật đăng ký
                     </h3>
                     <button onClick={() => setIsEditModalOpen(false)} className="text-slate-400 hover:text-slate-600 transition-colors"><X size={20} /></button>
                 </div>
@@ -437,9 +458,25 @@ const Registrations = () => {
                     <div className="bg-slate-50 p-4 rounded-xl border border-slate-100 text-sm text-slate-700 space-y-2">
                         <p className="flex justify-between"><span>Sinh viên:</span> <span className="font-bold">{editingItem.fullName}</span></p>
                         <p className="flex justify-between"><span>MSSV:</span> <span className="font-mono font-bold text-slate-500">{editingItem.mssv}</span></p>
-                        <p className="flex justify-between"><span>Đợt thi:</span> <span className="text-indigo-600 font-medium">{editingItem.roundName}</span></p>
                     </div>
 
+                    {/* Chọn Đợt Thi */}
+                    <div>
+                        <label className="block text-sm font-bold text-slate-700 mb-2">Đợt thi</label>
+                        <select 
+                            className="w-full rounded-xl border border-slate-300 p-3 text-sm focus:border-violet-500 focus:ring-2 focus:ring-violet-200 outline-none transition-all cursor-pointer"
+                            value={editingItem.roundId}
+                            onChange={(e) => setEditingItem({...editingItem, roundId: e.target.value})}
+                        >
+                            {sessions.map(s => (
+                                <option key={s.id || s.MaDot} value={s.id || s.MaDot}>
+                                    {s.TenDot} ({formatDateDisplay(s.NgayThi)})
+                                </option>
+                            ))}
+                        </select>
+                    </div>
+
+                    {/* Chọn Trạng Thái */}
                     <div>
                         <label className="block text-sm font-bold text-slate-700 mb-2">Trạng thái lệ phí</label>
                         <select 
