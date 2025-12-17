@@ -70,6 +70,19 @@ export const importStudents = (studentList) =>
       headers: authHeaders(), // Cần quyền admin/staff
     });
 
+  export const updateRegistrationStatus = (mssv, roundId, status) => 
+      request('/registrations/status', { 
+        method: 'PUT', 
+        headers: authHeaders(), 
+        body: JSON.stringify({ mssv, roundId, status }) 
+      });
+    
+  export const deleteRegistration = (mssv, roundId) => 
+      request(`/registrations?mssv=${mssv}&roundId=${roundId}`, { 
+        method: 'DELETE', 
+        headers: authHeaders() 
+      });
+
 export const getActiveExamRound = () =>
   request('/exam-rounds/active', {
     method: 'GET',
@@ -136,11 +149,12 @@ export const deleteStudent = (mssv) =>
     body: JSON.stringify({ mssv }), // Gửi MSSV trong body
   });
 
-export const getAdminRegistrations = () =>
-  request('/admin/registrations', {
-    method: 'GET',
-    headers: authHeaders(),
-  });
+  export const getAdminRegistrations = () =>
+    request('/admin/registrations', {
+      method: 'GET',
+      headers: authHeaders(),
+    });
+
 
 export const changePassword = (payload) =>
   request('/users/change-password', {
