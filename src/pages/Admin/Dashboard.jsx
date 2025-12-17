@@ -97,7 +97,7 @@ const Dashboard = () => {
               Xin chào, {user.fullname || user.username}! 👋
             </h1>
             <p className="text-blue-100 opacity-90 max-w-lg">
-              Chào mừng bạn quay trở lại hệ thống quản lý thi năng lực tiếng Anh. 
+              Chào mừng bạn quay trở lại hệ thống quản lý kiểm tra năng lực tiếng Anh. 
               Chúc bạn một ngày làm việc hiệu quả.
             </p>
           </div>
