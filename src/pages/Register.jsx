@@ -9,7 +9,6 @@ const STEPS = [
   { id: 1, title: 'Thông tin sinh viên', icon: 'fa-user-graduate' },
   { id: 2, title: 'Xác thực liên hệ', icon: 'fa-envelope-open-text' },
   { id: 3, title: 'Chọn đợt kiểm tra', icon: 'fa-calendar-alt' }, 
-  { id: 4, title: 'Thanh toán', icon: 'fa-credit-card' },
 ];
 
 const initialForm = {
@@ -24,24 +23,19 @@ const initialForm = {
 };
 
 // --- HELPERS ---
-
-// Hàm này giữ nguyên định dạng YYYY-MM-DD để dùng cho input type="date"
 const formatDate = (dateString) => {
   if (!dateString) return '';
   const date = new Date(dateString);
   return isNaN(date.getTime()) ? '' : date.toISOString().split('T')[0];
 };
 
-// Hàm hiển thị ngày đẹp theo định dạng dd/MM/yyyy
 const formatDateDisplay = (dateString) => {
     if (!dateString) return '...';
     const date = new Date(dateString);
     if (isNaN(date.getTime())) return dateString;
-    
     const day = String(date.getDate()).padStart(2, '0');
     const month = String(date.getMonth() + 1).padStart(2, '0');
     const year = date.getFullYear();
-    
     return `${day}/${month}/${year}`;
 };
 
@@ -67,12 +61,6 @@ const Register = () => {
   const [activeRounds, setActiveRounds] = useState([]); 
   const [roundLoading, setRoundLoading] = useState(false);
   
-  // State lưu kết quả đăng ký
-  const [registrationResult, setRegistrationResult] = useState(null);
-  
-  // State để hiển thị màn hình thành công
-  const [isSuccess, setIsSuccess] = useState(false);
-
   const navigate = useNavigate();
 
   // --- EFFECTS ---
@@ -81,19 +69,11 @@ const Register = () => {
       setRoundLoading(true);
       try {
         const res = await getActiveExamRound();
-        console.log("API Response Rounds:", res); 
-
         let data = [];
         if (Array.isArray(res)) {
             data = res;
         } else if (res && Array.isArray(res.data)) { 
             data = res.data;
-        } else if (res && Array.isArray(res.result)) {
-            data = res.result;
-        } else if (res && Array.isArray(res.items)) {
-            data = res.items;
-        } else if (res && res.data) {
-             data = [res.data];
         } else {
              data = [res];
         }
@@ -116,7 +96,6 @@ const Register = () => {
   }, []);
 
   // --- HANDLERS ---
-
   const handleChange = (event) => {
     const { name, value } = event.target;
     setFormData((prev) => ({ ...prev, [name]: value }));
@@ -153,7 +132,6 @@ const Register = () => {
       
       setStudentLoaded(true);
       setError('');
-
     } catch (err) {
       console.error("Lỗi tra cứu:", err);
       setError(err.message === 'Failed to fetch' ? 'Lỗi kết nối Server.' : (err.message || 'Không tìm thấy sinh viên.'));
@@ -172,11 +150,10 @@ const Register = () => {
     setMockOtpMessage('');
 
     try {
-        const res = await createOtp({ email: formData.email });
+        await createOtp({ email: formData.email });
         setIsOtpSent(true);
         setMockOtpMessage('Mã OTP đã được gửi đến email '+formData.email+', vui lòng kiểm tra email');
     } catch (err) {
-        console.error("Lỗi gửi OTP:", err);
         setError(err.message || 'Gửi mã thất bại. Vui lòng thử lại.');
     } finally {
         setOtpLoading(false);
@@ -188,61 +165,51 @@ const Register = () => {
           setError('Vui lòng nhập đủ 6 số OTP.');
           return;
       }
-      else {
-        try {
-            const res = await verifyOtp({ email: formData.email, otp: otp });
-            setIsEmailVerified(true);
-            setError('');
-            setMockOtpMessage('');
-        } catch (err) {
-            console.error("Lỗi xác thực OTP:", err);
-            setError(err.message || 'Xác thực mã thất bại. Vui lòng thử lại.');
-        }
+      try {
+        await verifyOtp({ email: formData.email, otp: otp });
+        setIsEmailVerified(true);
+        setError('');
+        setMockOtpMessage('');
+      } catch (err) {
+        setError(err.message || 'Xác thực mã thất bại. Vui lòng thử lại.');
       }
   };
 
-  // Đừng quên import updateStudentInfo ở trên cùng file nhé
-// import { ..., updateStudentInfo } from '../services/api.js';
-
-const handleNextStep = async () => {
+  // Hàm xử lý chuyển bước / Hoàn tất
+  const handleAction = async () => {
     // --- STEP 1: TRA CỨU ---
     if (currentStep === 1) {
         if (!studentLoaded) return setError("Vui lòng tra cứu sinh viên trước.");
+        setCurrentStep(2);
+        return;
     }
 
-    // --- STEP 2: XÁC THỰC & CẬP NHẬT THÔNG TIN (SỬA ĐỔI TẠI ĐÂY) ---
+    // --- STEP 2: XÁC THỰC & CẬP NHẬT ---
     if (currentStep === 2) {
-        // 1. Validate dữ liệu
         if (!isEmailVerified) return setError("Vui lòng xác thực Email trước.");
         if (!formData.phone || formData.phone.trim() === "") return setError("Vui lòng nhập số điện thoại.");
         
         setError('');
-        setSubmitLoading(true); // Tận dụng biến loading này để hiển thị spinner trên nút "Tiếp theo"
+        setSubmitLoading(true);
 
         try {
-            // 2. Gọi API cập nhật thông tin (Dùng fetch)
             await updateStudentInfo({
                 mssv: formData.mssv.trim(),
                 email: formData.email.trim(),
                 phone: formData.phone.trim()
             });
-            
-            // 3. Nếu thành công -> Chuyển bước
             console.log("Cập nhật thông tin liên hệ thành công!");
-            setCurrentStep(prev => prev + 1);
-
+            setCurrentStep(3);
         } catch (err) {
             console.error("Lỗi cập nhật:", err);
-            setError(err.message || "Không thể lưu thông tin liên hệ. Vui lòng thử lại.");
-            // Nếu lỗi thì return luôn, KHÔNG chuyển bước
-            return; 
+            setError(err.message || "Không thể lưu thông tin liên hệ.");
         } finally {
             setSubmitLoading(false);
         }
-        return; // Kết thúc logic Step 2 tại đây
+        return;
     }
     
-    // --- STEP 3: ĐĂNG KÝ THI ---
+    // --- STEP 3: ĐĂNG KÝ & CHUYỂN TRANG ---
     if (currentStep === 3) {
         if (!formData.sessionId) return setError("Vui lòng chọn một đợt kiểm tra."); 
         
@@ -262,125 +229,52 @@ const handleNextStep = async () => {
               faculty: formData.faculty
             };
 
-            const response = await registerForExam(payload);
-            setRegistrationResult(response);
+            await registerForExam(payload);
             
-            const regData = response.data || response; // Xử lý tùy theo cấu trúc trả về của fetch/axios cũ
-            const status = regData.TrangThai || regData.status || 'pending';
-
-            if (status === 'pending') {
-                setCurrentStep(prev => prev + 1);
-            } else {
-                setIsSuccess(true); 
-            }
+            // [QUAN TRỌNG] Chuyển trang và truyền MSSV, RoundId để bên Result tự load
+            navigate('/results', { 
+                state: { 
+                    autoFetch: true,
+                    mssv: formData.mssv,
+                    roundId: formData.sessionId
+                } 
+            });
             
         } catch (err) {
             console.error("Lỗi đăng ký:", err);
             const msg = err.message || "";
-
+            // Nếu đã đăng ký rồi thì vẫn cho qua Result để xem thông tin cũ
             if (msg.includes('đã đăng ký') || msg.includes('already registered')) {
-                if(window.confirm("Bạn đã có hồ sơ đăng ký cho đợt kiểm tra này. Bạn có muốn chuyển đến bước thanh toán không?")) { 
-                    setRegistrationResult({
-                        success: true,
-                        message: 'Đã có bản đăng ký trước đó',
-                        data: { ...formData, TrangThai: 'pending' } 
+                 if(window.confirm("Bạn đã đăng ký đợt thi này rồi. Bạn có muốn xem lại thông tin đăng ký không?")) {
+                    navigate('/results', { 
+                        state: { 
+                            autoFetch: true,
+                            mssv: formData.mssv,
+                            roundId: formData.sessionId
+                        } 
                     });
-                    setCurrentStep(prev => prev + 1);
-                }
-                return; 
+                 }
+            } else {
+                setError(msg === 'Failed to fetch' ? 'Mất kết nối server.' : msg);
             }
-
-            setError(msg === 'Failed to fetch' ? 'Mất kết nối server.' : msg);
-            return; 
         } finally {
             setSubmitLoading(false);
         }
-        return;
     }
-    
-    // Step 4 logic (nếu có)
-    setError('');
-    setCurrentStep(prev => prev + 1);
-};
+  };
 
   const prevStep = () => {
       setError('');
       setCurrentStep(prev => prev - 1);
   };
 
-  const handleSubmit = async () => {
-    setSubmitLoading(true);
-    setTimeout(() => {
-        setSubmitLoading(false);
-        setIsSuccess(true);
-    }, 1500);
-  };
-
-  // --- SỬA LOGIC TÌM ĐỢT THI & KHAI BÁO BIẾN HIỂN THỊ ---
-  
-  // Ép về String để so sánh an toàn (tránh lỗi 1 !== "1")
+  // --- VARIABLES HIỂN THỊ ---
   const selectedRound = activeRounds.find(r => String(r.id || r._id || r.MaDot) === String(formData.sessionId));
-  
-  // Tính toán trước các giá trị hiển thị, xử lý nhiều case chữ hoa/thường từ DB
   const displayRoundName = selectedRound ? (selectedRound.name || selectedRound.TenDot || selectedRound.ten_dot || '') : '';
-  
   const displayRoundDate = selectedRound ? formatDateDisplay(selectedRound.date || selectedRound.NgayThi || selectedRound.ngay_thi) : '';
-  
   const displayRoundFee = selectedRound 
       ? Number(selectedRound.lephi || selectedRound.LePhi || selectedRound.le_phi || selectedRound.fee || 0).toLocaleString('vi-VN') 
       : '0';
-
-  const isPaid = registrationResult?.data?.TrangThai === 'paid' || registrationResult?.data?.TrangThai === 'complete';
-
-  // --- MÀN HÌNH SUCCESS ---
-  if (isSuccess) {
-      return (
-        <div className="min-h-screen bg-slate-50 py-10 px-4 font-sans text-slate-800 flex items-center justify-center">
-            <div className="bg-white rounded-3xl shadow-2xl p-8 max-w-lg w-full text-center border border-slate-100">
-                <div className="w-20 h-20 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-6">
-                    <i className="fas fa-check text-4xl text-green-600"></i>
-                </div>
-                <h2 className="text-3xl font-bold text-blue-900 mb-2">Đăng Ký Thành Công!</h2>
-                <p className="text-slate-500 mb-8">Hệ thống đã ghi nhận thông tin và thanh toán của bạn.</p>
-                
-                <div className="bg-slate-50 rounded-xl p-6 text-left space-y-3 border border-slate-200 mb-8">
-                    <h3 className="font-bold text-slate-800 mb-3 border-b pb-2">Thông tin dự kiểm tra</h3>
-                    <div className="flex justify-between text-sm">
-                        <span className="text-slate-500">Sinh viên:</span>
-                        <span className="font-bold text-slate-800">{formData.fullName}</span>
-                    </div>
-                    <div className="flex justify-between text-sm">
-                        <span className="text-slate-500">MSSV:</span>
-                        <span className="font-bold text-slate-800">{formData.mssv}</span>
-                    </div>
-                    {selectedRound && (
-                        <>
-                            <div className="flex justify-between text-sm">
-                                <span className="text-slate-500">Đợt kiểm tra:</span> 
-                                <span className="font-bold text-blue-700">{displayRoundName}</span>
-                            </div>
-                            <div className="flex justify-between text-sm">
-                                <span className="text-slate-500">Ngày kiểm tra:</span>
-                                <span className="font-bold text-blue-700">{displayRoundDate}</span>
-                            </div>
-                        </>
-                    )}
-                    <div className="flex justify-between text-sm pt-2 border-t border-slate-200 mt-2">
-                        <span className="text-slate-500">Trạng thái:</span>
-                        <span className="font-bold text-green-600">Đã thanh toán</span>
-                    </div>
-                </div>
-
-                <button 
-                    onClick={() => window.location.reload()} 
-                    className="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 rounded-xl shadow-lg transition-all"
-                >
-                    Về trang chủ
-                </button>
-            </div>
-        </div>
-      );
-  }
 
   return (
     <div className="min-h-screen bg-slate-50 py-10 px-4 font-sans text-slate-800">
@@ -389,12 +283,12 @@ const handleNextStep = async () => {
         {/* HEADER */}
         <div className="text-center mb-8">
           <h1 className="text-3xl font-bold text-blue-900 mb-2 uppercase tracking-wide">Đăng Ký Kiểm Tra Năng Lực Tiếng Anh</h1>
-          <p className="text-slate-500">Hệ thống đăng ký trực tuyến & Thanh toán VNPay</p>
+          <p className="text-slate-500">Hệ thống đăng ký trực tuyến</p>
         </div>
 
         {/* STEPPER */}
         <div className="mb-8">
-            <div className="flex justify-between items-center relative">
+            <div className="flex justify-between items-center relative max-w-2xl mx-auto">
                 <div className="absolute top-1/2 left-0 w-full h-1 bg-slate-200 -z-10 rounded"></div>
                 <div 
                     className="absolute top-1/2 left-0 h-1 bg-blue-600 -z-10 rounded transition-all duration-500"
@@ -494,7 +388,6 @@ const handleNextStep = async () => {
                                 )}
                             </div>
 
-                            {/* OTP Input & Message */}
                             {isOtpSent && !isEmailVerified && (
                                 <div className="bg-orange-50 p-4 rounded-xl border border-orange-100 animate-in fade-in">
                                     {mockOtpMessage && (
@@ -530,7 +423,7 @@ const handleNextStep = async () => {
                 </div>
             )}
 
-            {/* --- BƯỚC 3: CHỌN ĐỢT KIỂM TRA --- */}
+            {/* --- BƯỚC 3: CHỌN ĐỢT KIỂM TRA & HOÀN TẤT --- */}
             {currentStep === 3 && (
                 <div className="p-8 animate-in fade-in slide-in-from-right-4 duration-500">
                     <h2 className="text-xl font-bold text-slate-800 mb-6 flex items-center">
@@ -553,8 +446,7 @@ const handleNextStep = async () => {
                                     <option value="">-- Vui lòng chọn đợt kiểm tra --</option> 
                                     {activeRounds.map(round => (
                                         <option key={round.id || round._id || round.MaDot} value={round.id || round._id || round.MaDot}>
-                                            {/* Hiển thị ngày tháng dạng dd/MM/yyyy */}
-                                            {round.name || round.TenDot || round.ten_dot} (Ngày kiểm tra: {formatDateDisplay(round.date || round.NgayThi || round.ngay_thi)}) 
+                                            {round.name || round.TenDot || round.ten_dot} (Ngày: {formatDateDisplay(round.date || round.NgayThi || round.ngay_thi)}) 
                                         </option>
                                     ))}
                                 </select>
@@ -563,7 +455,6 @@ const handleNextStep = async () => {
                                 </div>
                             </div>
 
-                            {/* Thông tin chi tiết đợt thi đã chọn */}
                             {formData.sessionId && (
                                 <div className="mt-6 bg-blue-50 border border-blue-200 rounded-xl p-6 flex flex-col md:flex-row md:items-center justify-between gap-4">
                                     <div>
@@ -572,12 +463,11 @@ const handleNextStep = async () => {
                                         </h4>
                                         <p className="text-sm text-blue-600">
                                             <i className="far fa-clock mr-2"></i>
-                                            {/* Hiển thị ngày tháng dạng dd/MM/yyyy */}
                                             Thời gian kiểm tra: <span className="font-bold">{displayRoundDate}</span>
                                         </p>
                                     </div>
                                     <div className="bg-white px-4 py-2 rounded-lg shadow-sm text-center border border-blue-100">
-                                        <p className="text-xs text-slate-500 uppercase font-bold">Lệ phí kiểm tra</p> 
+                                        <p className="text-xs text-slate-500 uppercase font-bold">Lệ phí</p> 
                                         <p className="text-xl font-bold text-red-600">
                                             {displayRoundFee} VNĐ
                                         </p>
@@ -594,81 +484,6 @@ const handleNextStep = async () => {
                 </div>
             )}
 
-            {/* --- BƯỚC 4: THANH TOÁN --- */}
-            {currentStep === 4 && (
-                <div className="p-8 animate-in fade-in slide-in-from-right-4 duration-500">
-                    <h2 className="text-xl font-bold text-slate-800 mb-6 flex items-center">
-                        <span className="bg-blue-100 text-blue-600 w-8 h-8 rounded-lg flex items-center justify-center mr-3"><i className="fas fa-money-check-alt"></i></span>
-                        Thanh toán & Hoàn tất
-                    </h2>
-
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-                        {/* Thông tin tóm tắt */}
-                        <div className="bg-slate-50 p-6 rounded-xl border border-slate-200 space-y-4">
-                            <h3 className="font-bold text-slate-700 border-b border-slate-200 pb-2">Thông tin đăng ký</h3>
-                            <div className="text-sm space-y-2">
-                                <p className="flex justify-between"><span className="text-slate-500">Sinh viên:</span> <span className="font-semibold">{formData.fullName}</span></p>
-                                <p className="flex justify-between"><span className="text-slate-500">MSSV:</span> <span className="font-semibold">{formData.mssv}</span></p>
-                                
-                                {selectedRound && (
-                                    <div className="py-2 border-t border-b border-slate-100 my-2">
-                                        <p className="flex justify-between mb-1"><span className="text-slate-500">Đợt kiểm tra:</span> <span className="font-bold text-blue-700">{displayRoundName}</span></p> 
-                                        <p className="flex justify-between"><span className="text-slate-500">Ngày kiểm tra:</span> <span className="font-bold text-blue-700">{displayRoundDate}</span></p> 
-                                    </div>
-                                )}
-                                
-                                <div className="pt-2 text-lg">
-                                    <div className="flex justify-between">
-                                        <span className="font-bold text-slate-700">Tổng tiền:</span>
-                                        <span className="font-bold text-red-600">
-                                            {displayRoundFee} đ
-                                        </span>
-                                    </div>
-                                    
-                                    {/* TRẠNG THÁI THANH TOÁN */}
-                                    <div className="mt-3 flex justify-end">
-                                        {isPaid ? (
-                                            <span className="bg-green-100 text-green-700 px-3 py-1 rounded-full text-xs font-bold uppercase border border-green-200 shadow-sm flex items-center">
-                                                <i className="fas fa-check-circle mr-2"></i> Đã thanh toán
-                                            </span>
-                                        ) : (
-                                            <span className="bg-yellow-100 text-yellow-700 px-3 py-1 rounded-full text-xs font-bold uppercase border border-yellow-200 shadow-sm flex items-center">
-                                                <i className="fas fa-clock mr-2"></i> Chưa thanh toán
-                                            </span>
-                                        )}
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-
-                        {/* Chọn phương thức thanh toán */}
-                        <div className="space-y-4">
-                            <h3 className="font-bold text-slate-700">Phương thức thanh toán</h3>
-                            
-                            <label className={`flex items-center p-4 border-2 border-blue-500 bg-blue-50 rounded-xl cursor-pointer shadow-sm relative overflow-hidden ${isPaid ? 'opacity-50 cursor-not-allowed' : ''}`}>
-                                <div className="absolute top-0 right-0 bg-blue-500 text-white text-[10px] px-2 py-1 rounded-bl-lg font-bold">KHUYÊN DÙNG</div>
-                                <input type="radio" name="payment" defaultChecked disabled={isPaid} className="w-5 h-5 text-blue-600 focus:ring-blue-500 mr-4" />
-                                <div className="flex-1">
-                                    <div className="flex items-center gap-2">
-                                        <span className="font-bold text-slate-800">Ví VNPAY-QR</span>
-                                        <img src="https://vinadesign.vn/uploads/images/2023/05/vnpay-logo-vinadesign-25-12-57-55.jpg" alt="VNPAY" className="h-6 object-contain" />
-                                    </div>
-                                    <p className="text-xs text-slate-500 mt-1">Quét mã QR trên ứng dụng ngân hàng hoặc ví VNPAY.</p>
-                                </div>
-                            </label>
-
-                            <label className="flex items-center p-4 border border-slate-200 rounded-xl cursor-not-allowed opacity-60">
-                                <input type="radio" name="payment" disabled className="w-5 h-5 text-slate-400 mr-4" />
-                                <div className="flex-1">
-                                    <span className="font-bold text-slate-500">Thẻ ATM / Visa / Master</span>
-                                    <p className="text-xs text-slate-400 mt-1">Chức năng đang bảo trì.</p>
-                                </div>
-                            </label>
-                        </div>
-                    </div>
-                </div>
-            )}
-
             {/* --- ACTION BUTTONS (Footer) --- */}
             <div className="bg-slate-50 px-8 py-4 border-t border-slate-200 flex justify-between items-center">
                 {currentStep > 1 ? (
@@ -677,24 +492,19 @@ const handleNextStep = async () => {
                     </button>
                 ) : <div></div>}
 
-                {currentStep < 4 ? (
-                    <button 
-                        onClick={handleNextStep} 
-                        disabled={submitLoading} 
-                        className="bg-blue-600 hover:bg-blue-700 text-white px-8 py-3 rounded-lg font-bold shadow-lg hover:shadow-xl transition-all transform hover:-translate-y-0.5 active:translate-y-0 flex items-center disabled:opacity-50 disabled:cursor-not-allowed"
-                    >
-                        {submitLoading ? 'Đang lưu...' : <>Tiếp theo <i className="fas fa-arrow-right ml-2"></i></>}
-                    </button>
-                ) : (
-                    <button 
-                        onClick={handleSubmit} 
-                        disabled={submitLoading || isPaid}
-                        className={`text-white px-10 py-3 rounded-lg font-bold shadow-lg transition-all transform hover:scale-105 active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed disabled:transform-none disabled:shadow-none
-                            ${isPaid ? 'bg-green-600 cursor-default' : 'bg-gradient-to-r from-red-500 to-orange-500 hover:from-red-600 hover:to-orange-600 hover:shadow-orange-200'}`}
-                    >
-                        {submitLoading ? 'Đang xử lý...' : isPaid ? 'ĐÃ THANH TOÁN THÀNH CÔNG' : 'THANH TOÁN NGAY'}
-                    </button>
-                )}
+                {/* LOGIC NÚT ĐỔI: Bước 1,2 là Tiếp theo. Bước 3 là Hoàn tất */}
+                <button 
+                    onClick={handleAction} 
+                    disabled={submitLoading} 
+                    className={`text-white px-8 py-3 rounded-lg font-bold shadow-lg hover:shadow-xl transition-all transform hover:-translate-y-0.5 active:translate-y-0 flex items-center disabled:opacity-50 disabled:cursor-not-allowed
+                        ${currentStep === 3 ? 'bg-green-600 hover:bg-green-700' : 'bg-blue-600 hover:bg-blue-700'}`}
+                >
+                    {submitLoading ? 'Đang xử lý...' : (
+                        currentStep === 3 
+                        ? <><i className="fas fa-check-circle mr-2"></i> Hoàn tất đăng ký</>
+                        : <>Tiếp theo <i className="fas fa-arrow-right ml-2"></i></>
+                    )}
+                </button>
             </div>
 
         </div>
