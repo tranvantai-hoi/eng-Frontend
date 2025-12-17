@@ -50,12 +50,25 @@ export const importStudents = (studentList) =>
     body: JSON.stringify(studentList),
   });
 
-export const registerForExam = (payload) =>
-  request('/registrations/register', {
-    method: 'POST',
-    headers: defaultHeaders(),
-    body: JSON.stringify(payload),
-  });
+  export const registerForExam = (payload) =>
+    request('/registrations/register', {
+      method: 'POST',
+      headers: defaultHeaders(),
+      body: JSON.stringify(payload),
+    });
+  
+  // [SỬA LẠI] Dùng query string thay vì body cho GET request
+  export const getRegistrationById = (mssv, roundId) =>
+    request(`/registrations/by-id?mssv=${encodeURIComponent(mssv)}&roundId=${encodeURIComponent(roundId)}`, {
+      method: 'GET',
+      headers: defaultHeaders(),
+    });
+  
+  export const getRegistrationsByRound = (roundId) =>
+    request(`/registrations/by-round/${roundId}`, {
+      method: 'GET',
+      headers: authHeaders(), // Cần quyền admin/staff
+    });
 
 export const getActiveExamRound = () =>
   request('/exam-rounds/active', {
