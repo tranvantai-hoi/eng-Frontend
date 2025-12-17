@@ -11,27 +11,40 @@ import {
   Phone, 
   Save, 
   X,
-  CalendarDays
+  CalendarDays,
+  ChevronLeft,
+  ChevronRight,
+  ChevronsLeft,
+  ChevronsRight,
+  Loader2
 } from 'lucide-react';
 
-// --- QUAN TRỌNG: Đã thêm importStudents vào import ---
-import { getAdminStudents, updateStudentFullInfo, importStudents } from '../../services/api.js';
+// Import API services
+import { getAdminStudents, updateStudentFullInfo, importStudents, deleteStudent } from '../../services/api.js';
 
 const Students = () => {
-  // --- STATE ---
+  // --- STATE QUẢN LÝ DỮ LIỆU ---
   const [students, setStudents] = useState([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [searchTerm, setSearchTerm] = useState('');
   
-  // State Modal Edit
+  // --- STATE PHÂN TRANG ---
+  const [currentPage, setCurrentPage] = useState(1);
+  const itemsPerPage = 20; // Số lượng hiển thị trên 1 trang
+
+  // --- STATE IMPORT EXCEL (MỚI) ---
+  const [isImporting, setIsImporting] = useState(false);
+  const [importProgress, setImportProgress] = useState(0);
+
+  // --- STATE MODAL EDIT ---
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
   const [editingStudent, setEditingStudent] = useState(null);
 
   // Ref cho input file upload
   const fileInputRef = useRef(null);
 
-  // --- HELPER: FORMAT DATE (dd/MM/yyyy) ---
+  // --- HELPER: FORMAT DATE ---
   const formatDateDisplay = (isoString) => {
     if (!isoString) return '---';
     try {
@@ -48,7 +61,6 @@ const Students = () => {
     }
   };
 
-  // Helper cho input type="date" (YYYY-MM-DD)
   const formatDateInput = (isoString) => {
     if (!isoString) return '';
     try {
@@ -65,7 +77,6 @@ const Students = () => {
     setError('');
     try {
       const response = await getAdminStudents();
-      // Xử lý dữ liệu trả về tùy theo cấu trúc response của bạn
       const data = Array.isArray(response) ? response : (response.data || []);
       setStudents(data);
     } catch (err) {
@@ -80,7 +91,7 @@ const Students = () => {
     fetchStudents();
   }, []);
 
-  // --- SEARCH ---
+  // --- SEARCH & FILTER ---
   const filteredStudents = useMemo(() => {
     return students.filter((student) => {
       const searchStr = searchTerm.toLowerCase();
@@ -93,9 +104,23 @@ const Students = () => {
     });
   }, [students, searchTerm]);
 
-  // --- HANDLERS: EXCEL ---
+  // --- PAGINATION LOGIC ---
+  useEffect(() => {
+    setCurrentPage(1); // Reset về trang 1 khi tìm kiếm
+  }, [searchTerm]);
 
-  // 1. Xuất Excel
+  const totalPages = Math.ceil(filteredStudents.length / itemsPerPage);
+  const startIndex = (currentPage - 1) * itemsPerPage;
+  const paginatedStudents = filteredStudents.slice(startIndex, startIndex + itemsPerPage);
+
+  const goToPage = (page) => {
+    if (page >= 1 && page <= totalPages) {
+      setCurrentPage(page);
+    }
+  };
+
+  // --- HANDLERS: EXCEL (UPDATED FOR LARGE FILES) ---
+
   const handleExportExcel = () => {
     if (filteredStudents.length === 0) {
       alert("Không có dữ liệu để xuất!");
@@ -105,7 +130,7 @@ const Students = () => {
     const dataToExport = filteredStudents.map(student => ({
       'MSSV': student.mssv,
       'Họ và tên': student.fullName,
-      'Ngày sinh': formatDateDisplay(student.dob), // Sử dụng format dd/MM/yyyy
+      'Ngày sinh': formatDateDisplay(student.dob),
       'Giới tính': student.gender,
       'Lớp/Khoa': student.faculty || student.className,
       'Email': student.email,
@@ -113,17 +138,7 @@ const Students = () => {
     }));
 
     const worksheet = XLSX.utils.json_to_sheet(dataToExport);
-    
-    // Tự động điều chỉnh độ rộng cột (Optional)
-    const wscols = [
-        {wch: 15}, // MSSV
-        {wch: 25}, // Họ tên
-        {wch: 15}, // Ngày sinh
-        {wch: 10}, // Giới tính
-        {wch: 15}, // Lớp
-        {wch: 30}, // Email
-        {wch: 15}  // SĐT
-    ];
+    const wscols = [{wch: 15}, {wch: 25}, {wch: 15}, {wch: 10}, {wch: 15}, {wch: 30}, {wch: 15}];
     worksheet['!cols'] = wscols;
 
     const workbook = XLSX.utils.book_new();
@@ -132,13 +147,11 @@ const Students = () => {
     XLSX.writeFile(workbook, "Danh_Sach_Sinh_Vien.xlsx");
   };
 
-  // 2. Nhập Excel
   const handleImportExcelClick = () => {
-    if (fileInputRef.current) {
-        fileInputRef.current.click();
-    }
+    if (fileInputRef.current) fileInputRef.current.click();
   };
 
+  // --- LOGIC NHẬP EXCEL ĐÃ TỐI ƯU (BATCHING) ---
   const handleFileUpload = (e) => {
     const file = e.target.files[0];
     if (!file) return;
@@ -157,46 +170,72 @@ const Students = () => {
                 return;
             }
 
-            // 1. Mapping dữ liệu từ Header tiếng Việt sang field DB
-            // Giả sử file Excel có header: MSSV | Họ và tên | Ngày sinh | Giới tính | Lớp/Khoa | Email | Số điện thoại
+            // Mapping dữ liệu
             const mappedData = jsonData.map(row => ({
                 mssv: row['MSSV'] || row['mssv'],
                 fullName: row['Họ và tên'] || row['HoTen'] || row['Họ tên'],
-                // Xử lý ngày tháng Excel (có thể là số serial hoặc string)
                 dob: row['Ngày sinh'] || row['NgaySinh'], 
                 gender: row['Giới tính'] || row['GioiTinh'],
                 faculty: row['Lớp/Khoa'] || row['Lớp'] || row['Lop'],
                 email: row['Email'] || row['email'],
                 phone: row['Số điện thoại'] || row['SDT'] || row['dienthoai']
-            }));
+            })).filter(item => item.mssv); // Lọc bỏ dòng không có MSSV
 
-            // Lọc bỏ dòng không có MSSV
-            const validData = mappedData.filter(item => item.mssv);
-
-            if (validData.length === 0) {
+            if (mappedData.length === 0) {
                 alert("Không tìm thấy dữ liệu hợp lệ (Thiếu cột MSSV).");
                 return;
             }
 
-            // 2. Gọi API Import
-            if(window.confirm(`Tìm thấy ${validData.length} sinh viên hợp lệ. Bạn có muốn nhập vào hệ thống?`)) {
-                setLoading(true);
-                try {
-                    const res = await importStudents(validData);
-                    alert(res.message || "Nhập dữ liệu thành công!");
-                    fetchStudents(); // Tải lại danh sách
-                } catch (apiErr) {
-                    alert("Lỗi khi lưu vào CSDL: " + apiErr.message);
-                } finally {
-                    setLoading(false);
-                }
+            if(!window.confirm(`Tìm thấy ${mappedData.length} sinh viên hợp lệ. Bạn có muốn nhập vào hệ thống?`)) {
+                e.target.value = null;
+                return;
             }
+
+            // --- BẮT ĐẦU XỬ LÝ THEO LÔ (BATCHING) ---
+            setIsImporting(true);
+            setImportProgress(0);
             
-            // Reset input
-            e.target.value = null;
+            // Cấu hình kích thước lô (Batch Size)
+            // 200 là con số an toàn để không bị timeout hoặc lỗi payload too large
+            const BATCH_SIZE = 200; 
+            const totalBatches = Math.ceil(mappedData.length / BATCH_SIZE);
+            let successCount = 0;
+            let errorBatches = [];
+
+            for (let i = 0; i < totalBatches; i++) {
+                const start = i * BATCH_SIZE;
+                const end = start + BATCH_SIZE;
+                const chunk = mappedData.slice(start, end);
+
+                try {
+                    // Gọi API import cho từng phần nhỏ
+                    await importStudents(chunk);
+                    successCount += chunk.length;
+                } catch (err) {
+                    console.error(`Lỗi import lô ${i + 1}:`, err);
+                    errorBatches.push(i + 1);
+                }
+
+                // Cập nhật thanh tiến trình
+                const currentProgress = Math.round(((i + 1) / totalBatches) * 100);
+                setImportProgress(currentProgress);
+            }
+
+            // Kết thúc
+            setIsImporting(false);
+            e.target.value = null; // Reset file input
+
+            let msg = `Đã xử lý xong!\n- Thành công: ${successCount}/${mappedData.length} bản ghi.`;
+            if (errorBatches.length > 0) {
+                msg += `\n- Có lỗi tại các lô: ${errorBatches.join(', ')} (Vui lòng kiểm tra lại dữ liệu các dòng này).`;
+            }
+            alert(msg);
+            fetchStudents(); // Tải lại danh sách mới nhất
+
         } catch (error) {
             console.error("Lỗi đọc file Excel:", error);
-            alert("Lỗi khi đọc file. Vui lòng đảm bảo đúng định dạng Excel.");
+            alert("Lỗi nghiêm trọng khi đọc file. Vui lòng thử lại.");
+            setIsImporting(false);
         }
     };
     reader.readAsBinaryString(file);
@@ -223,7 +262,6 @@ const Students = () => {
 
   const handleSaveEdit = async () => {
     if (!editingStudent) return;
-    
     try {
       await updateStudentFullInfo(editingStudent);
       alert('Cập nhật thông tin sinh viên thành công!');
@@ -235,12 +273,17 @@ const Students = () => {
     }
   };
 
-  const handleDeleteClick = (mssv) => {
-    if (window.confirm(`Bạn có chắc muốn xóa sinh viên ${mssv}?`)) {
-      // TODO: Gọi API xóa
-      // await deleteStudent(mssv);
-      setStudents(prev => prev.filter(s => s.mssv !== mssv));
-      alert("Đã xóa khỏi danh sách hiển thị.");
+  const handleDeleteClick = async (mssv) => {
+    if (window.confirm(`CẢNH BÁO: Bạn có chắc muốn xóa sinh viên ${mssv} vĩnh viễn?`)) {
+      try {
+        await deleteStudent(mssv);
+        // Cập nhật state trực tiếp để UI phản hồi nhanh
+        setStudents(prev => prev.filter(s => s.mssv !== mssv));
+        alert(`Đã xóa sinh viên ${mssv} thành công.`);
+      } catch (err) {
+        console.error("Lỗi khi xóa:", err);
+        alert("Xóa thất bại: " + (err.message || "Lỗi server"));
+      }
     }
   };
 
@@ -261,15 +304,19 @@ const Students = () => {
                 onChange={handleFileUpload} 
                 accept=".xlsx, .xls" 
                 className="hidden" 
+                disabled={isImporting} // Disable khi đang nhập
             />
             <button 
                 onClick={handleImportExcelClick}
-                className="inline-flex items-center gap-2 rounded-xl bg-white px-4 py-2.5 text-sm font-medium text-slate-700 shadow-sm ring-1 ring-inset ring-slate-200 hover:bg-slate-50 hover:text-blue-600 transition-all"
+                disabled={isImporting}
+                className={`inline-flex items-center gap-2 rounded-xl bg-white px-4 py-2.5 text-sm font-medium text-slate-700 shadow-sm ring-1 ring-inset ring-slate-200 transition-all ${isImporting ? 'opacity-50 cursor-not-allowed' : 'hover:bg-slate-50 hover:text-blue-600'}`}
             >
-                <Upload size={16} className="text-blue-500" /> Nhập Excel
+                {isImporting ? <Loader2 size={16} className="animate-spin"/> : <Upload size={16} className="text-blue-500" />} 
+                {isImporting ? 'Đang nhập...' : 'Nhập Excel'}
             </button>
             <button 
                 onClick={handleExportExcel}
+                disabled={isImporting}
                 className="inline-flex items-center gap-2 rounded-xl bg-white px-4 py-2.5 text-sm font-medium text-slate-700 shadow-sm ring-1 ring-inset ring-slate-200 hover:bg-slate-50 hover:text-green-600 transition-all"
             >
                 <Download size={16} className="text-green-600" /> Xuất Excel
@@ -278,7 +325,7 @@ const Students = () => {
       </header>
 
       {/* Main Content */}
-      <div className="rounded-2xl border border-orange-100 bg-white shadow-xl shadow-orange-100/50 animate-fade-in-up">
+      <div className="rounded-2xl border border-orange-100 bg-white shadow-xl shadow-orange-100/50 animate-fade-in-up flex flex-col min-h-[600px]">
         
         {/* Toolbar */}
         <div className="flex flex-col border-b border-orange-50 p-5 md:flex-row md:items-center md:justify-between gap-4">
@@ -295,13 +342,13 @@ const Students = () => {
             />
           </div>
           <div className="text-sm text-slate-500">
-            Tổng: <span className="font-bold text-orange-600">{filteredStudents.length}</span> sinh viên
+            Tổng: <span className="font-bold text-orange-600">{filteredStudents.length}</span> kết quả
           </div>
         </div>
 
-        {/* Table */}
-        <div className="overflow-x-auto min-h-[400px]">
-          {loading ? (
+        {/* Table Wrapper */}
+        <div className="overflow-x-auto flex-grow">
+          {loading && !isImporting ? (
             <div className="flex h-64 items-center justify-center"><div className="h-8 w-8 animate-spin rounded-full border-4 border-orange-200 border-t-orange-600"></div></div>
           ) : error ? (
             <div className="flex h-64 flex-col items-center justify-center text-red-500">
@@ -312,6 +359,7 @@ const Students = () => {
             <table className="min-w-full divide-y divide-orange-50">
               <thead className="bg-orange-50/50">
                 <tr>
+                  <th className="px-6 py-4 text-left text-xs font-semibold uppercase text-slate-500">#</th>
                   <th className="px-6 py-4 text-left text-xs font-semibold uppercase text-slate-500">Sinh viên</th>
                   <th className="px-6 py-4 text-left text-xs font-semibold uppercase text-slate-500">Thông tin cá nhân</th>
                   <th className="px-6 py-4 text-left text-xs font-semibold uppercase text-slate-500">Lớp / Khoa</th>
@@ -320,53 +368,115 @@ const Students = () => {
                 </tr>
               </thead>
               <tbody className="divide-y divide-orange-50 bg-white">
-                {filteredStudents.map((student, index) => (
-                  <tr key={student.mssv || index} className="group hover:bg-orange-50/30 transition-colors">
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      <div className="flex items-center">
-                        <div className="h-10 w-10 rounded-full bg-gradient-to-br from-blue-400 to-indigo-500 flex items-center justify-center text-white font-bold text-sm shadow-sm">
-                          {student.fullName ? student.fullName.charAt(0).toUpperCase() : 'S'}
+                {paginatedStudents.length > 0 ? (
+                  paginatedStudents.map((student, index) => (
+                    <tr key={student.mssv || index} className="group hover:bg-orange-50/30 transition-colors">
+                      <td className="px-6 py-4 whitespace-nowrap text-xs text-slate-400">
+                         {startIndex + index + 1}
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap">
+                        <div className="flex items-center">
+                          <div className="h-10 w-10 rounded-full bg-gradient-to-br from-blue-400 to-indigo-500 flex items-center justify-center text-white font-bold text-sm shadow-sm">
+                            {student.fullName ? student.fullName.charAt(0).toUpperCase() : 'S'}
+                          </div>
+                          <div className="ml-4">
+                            <div className="font-medium text-slate-900">{student.fullName}</div>
+                            <div className="text-xs text-slate-500 font-mono bg-slate-100 px-1.5 py-0.5 rounded inline-block mt-0.5">{student.mssv}</div>
+                          </div>
                         </div>
-                        <div className="ml-4">
-                          <div className="font-medium text-slate-900">{student.fullName}</div>
-                          <div className="text-xs text-slate-500 font-mono bg-slate-100 px-1.5 py-0.5 rounded inline-block mt-0.5">{student.mssv}</div>
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap">
+                        <div className="text-sm text-slate-600 space-y-1">
+                          <div className="flex items-center gap-2"><CalendarDays size={14} className="text-slate-400"/> {formatDateDisplay(student.dob)}</div>
+                          <div className="flex items-center gap-2"><User size={14} className="text-slate-400"/> {student.gender || '---'}</div>
                         </div>
-                      </div>
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      <div className="text-sm text-slate-600 space-y-1">
-                        <div className="flex items-center gap-2"><CalendarDays size={14} className="text-slate-400"/> {formatDateDisplay(student.dob)}</div>
-                        <div className="flex items-center gap-2"><User size={14} className="text-slate-400"/> {student.gender || '---'}</div>
-                      </div>
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      <span className="inline-flex items-center rounded-md bg-slate-50 px-2.5 py-1 text-xs font-medium text-slate-700 border border-slate-200">
-                        {student.faculty || student.className || '---'}
-                      </span>
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      <div className="text-sm text-slate-600 space-y-1">
-                        <div className="flex items-center"><Mail size={14} className="mr-2 text-slate-400"/> {student.email || '---'}</div>
-                        <div className="flex items-center"><Phone size={14} className="mr-2 text-slate-400"/> {student.phone || '---'}</div>
-                      </div>
-                    </td>
-                    <td className="px-6 py-4 text-right whitespace-nowrap">
-                      <div className="flex items-center justify-end gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
-                        <button onClick={() => handleEditClick(student)} className="p-2 text-slate-400 hover:text-orange-600 hover:bg-orange-100 rounded-lg transition-colors" title="Chỉnh sửa"><Edit2 size={18} /></button>
-                        <button onClick={() => handleDeleteClick(student.mssv)} className="p-2 text-slate-400 hover:text-red-600 hover:bg-red-100 rounded-lg transition-colors" title="Xóa"><Trash2 size={18} /></button>
-                      </div>
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap">
+                        <span className="inline-flex items-center rounded-md bg-slate-50 px-2.5 py-1 text-xs font-medium text-slate-700 border border-slate-200">
+                          {student.faculty || student.className || '---'}
+                        </span>
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap">
+                        <div className="text-sm text-slate-600 space-y-1">
+                          <div className="flex items-center"><Mail size={14} className="mr-2 text-slate-400"/> {student.email || '---'}</div>
+                          <div className="flex items-center"><Phone size={14} className="mr-2 text-slate-400"/> {student.phone || '---'}</div>
+                        </div>
+                      </td>
+                      <td className="px-6 py-4 text-right whitespace-nowrap">
+                        <div className="flex items-center justify-end gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                          <button onClick={() => handleEditClick(student)} className="p-2 text-slate-400 hover:text-orange-600 hover:bg-orange-100 rounded-lg transition-colors" title="Chỉnh sửa"><Edit2 size={18} /></button>
+                          <button onClick={() => handleDeleteClick(student.mssv)} className="p-2 text-slate-400 hover:text-red-600 hover:bg-red-100 rounded-lg transition-colors" title="Xóa"><Trash2 size={18} /></button>
+                        </div>
+                      </td>
+                    </tr>
+                  ))
+                ) : (
+                  <tr>
+                    <td colSpan="6" className="px-6 py-10 text-center text-slate-500 italic">
+                      Không tìm thấy sinh viên nào.
                     </td>
                   </tr>
-                ))}
+                )}
               </tbody>
             </table>
           )}
         </div>
+
+        {/* Pagination Footer */}
+        {!loading && !error && filteredStudents.length > 0 && (
+          <div className="border-t border-orange-50 px-6 py-4 flex items-center justify-between bg-slate-50/50 rounded-b-2xl">
+             <div className="text-sm text-slate-500">
+                Hiển thị <span className="font-medium">{startIndex + 1}</span> đến <span className="font-medium">{Math.min(startIndex + itemsPerPage, filteredStudents.length)}</span> trong tổng số <span className="font-medium">{filteredStudents.length}</span>
+             </div>
+             
+             <div className="flex items-center gap-2">
+                <button 
+                  onClick={() => goToPage(1)} 
+                  disabled={currentPage === 1}
+                  className="p-2 rounded-lg hover:bg-white hover:shadow-sm disabled:opacity-30 disabled:hover:bg-transparent transition-all"
+                  title="Trang đầu"
+                >
+                  <ChevronsLeft size={18} />
+                </button>
+                <button 
+                  onClick={() => goToPage(currentPage - 1)} 
+                  disabled={currentPage === 1}
+                  className="p-2 rounded-lg hover:bg-white hover:shadow-sm disabled:opacity-30 disabled:hover:bg-transparent transition-all"
+                  title="Trang trước"
+                >
+                  <ChevronLeft size={18} />
+                </button>
+                
+                <div className="flex items-center gap-1 px-2">
+                   <span className="text-sm font-semibold text-orange-600">{currentPage}</span>
+                   <span className="text-sm text-slate-400">/</span>
+                   <span className="text-sm text-slate-600">{totalPages}</span>
+                </div>
+
+                <button 
+                  onClick={() => goToPage(currentPage + 1)} 
+                  disabled={currentPage === totalPages}
+                  className="p-2 rounded-lg hover:bg-white hover:shadow-sm disabled:opacity-30 disabled:hover:bg-transparent transition-all"
+                  title="Trang sau"
+                >
+                  <ChevronRight size={18} />
+                </button>
+                <button 
+                  onClick={() => goToPage(totalPages)} 
+                  disabled={currentPage === totalPages}
+                  className="p-2 rounded-lg hover:bg-white hover:shadow-sm disabled:opacity-30 disabled:hover:bg-transparent transition-all"
+                  title="Trang cuối"
+                >
+                  <ChevronsRight size={18} />
+                </button>
+             </div>
+          </div>
+        )}
       </div>
 
       {/* Edit Modal */}
       {isEditModalOpen && editingStudent && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/50 backdrop-blur-sm p-4 animate-fade-in">
+        <div className="fixed inset-0 z-40 flex items-center justify-center bg-slate-900/50 backdrop-blur-sm p-4 animate-fade-in">
           <div className="w-full max-w-lg rounded-2xl bg-white shadow-2xl overflow-hidden animate-zoom-in">
             <div className="bg-orange-50 px-6 py-4 border-b border-orange-100 flex justify-between items-center">
               <h3 className="font-bold text-slate-800 flex items-center gap-2"><Edit2 size={18}/> Cập nhật hồ sơ sinh viên</h3>
@@ -399,7 +509,7 @@ const Students = () => {
               </div>
 
               <div className="col-span-2">
-                <label className="block text-sm font-medium text-slate-700 mb-1">Lớp / Khoa</label>
+                <label className="block text-sm font-medium text-slate-700 mb-1">Lớp</label>
                 <input name="faculty" type="text" value={editingStudent.faculty} onChange={handleChange} className="w-full rounded-lg border-slate-200 focus:border-orange-500 focus:ring-orange-500" />
               </div>
 
@@ -423,6 +533,29 @@ const Students = () => {
           </div>
         </div>
       )}
+
+      {/* IMPORT PROGRESS MODAL (MỚI THÊM) */}
+      {isImporting && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 backdrop-blur-sm">
+          <div className="bg-white p-8 rounded-2xl shadow-2xl max-w-sm w-full text-center animate-zoom-in">
+            <h3 className="text-xl font-bold text-slate-800 mb-2">Đang nhập dữ liệu...</h3>
+            <p className="text-sm text-slate-500 mb-6">Vui lòng không đóng trình duyệt.</p>
+            
+            <div className="relative w-full h-4 bg-slate-100 rounded-full overflow-hidden mb-3">
+               <div 
+                 className="absolute top-0 left-0 h-full bg-gradient-to-r from-orange-400 to-orange-600 transition-all duration-300 ease-out"
+                 style={{ width: `${importProgress}%` }}
+               ></div>
+            </div>
+            
+            <div className="flex justify-between text-xs font-semibold text-slate-600">
+               <span>Tiến độ</span>
+               <span>{importProgress}%</span>
+            </div>
+          </div>
+        </div>
+      )}
+
     </div>
   );
 };
