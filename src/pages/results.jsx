@@ -96,6 +96,19 @@ const Results = () => {
     } catch { return isoString; }
   };
 
+  // Logic tạo Nội dung và QR Code theo yêu cầu mới
+  const getQrData = () => {
+    if (!result) return { content: '', url: '' };
+    // Nội dung: TA_Năm_Đợt_Mã sinh viên
+    const year = result.NgayThi ? new Date(result.NgayThi).getFullYear() : new Date().getFullYear();
+    const content = `TA ${year} Dot ${result.RoundId} ${result.MaSV}`;
+    // Link API VietQR Agribank (BIN 970405)
+    const url = `https://img.vietqr.io/image/agribank-5200205598317-compact2.jpg?amount=${result.lephi}&addInfo=${encodeURIComponent(content)}&accountName=PHONG%20DAO%20TAO`;
+    return { content, url };
+  };
+
+  const qrData = getQrData();
+
   return (
     <div className="mx-auto max-w-3xl space-y-8 animate-fade-in py-10 px-4">
       {/* Header */}
@@ -193,42 +206,49 @@ const Results = () => {
                  </div>
             </div>
 
-            {/* HƯỚNG DẪN THANH TOÁN (Chỉ hiện khi chưa đóng phí) */}
+            {/* HƯỚNG DẪN THANH TOÁN (Chỉnh sửa phần VietQR) */}
             {result.TrangThai !== 'paid' && (
                 <div className="mt-8 bg-orange-50 rounded-xl p-5 border border-orange-200">
                     <h4 className="font-bold text-orange-800 mb-3 flex items-center">
                         <i className="fas fa-bullhorn mr-2"></i> THÔNG BÁO QUAN TRỌNG
                     </h4>
-                    <ul className="text-sm text-slate-700 space-y-2 list-disc list-inside">
+                    <ul className="text-sm text-slate-700 space-y-2 list-disc list-inside mb-4">
                         <li>Sinh viên đóng lệ phí qua tài khoản bên dưới hoặc trực tiếp tại phòng Đào tạo.</li>
                         <li>Sinh viên phải hoàn thành việc đóng lệ phí <span className="font-bold text-red-600">trước ngày kiểm tra 1 tuần</span>.</li>
                         <li>Quá thời gian trên coi như sinh viên không tham gia thi.</li>
-                        <li><span className="font-bold text-red-600">Sinh viên cần kiểm tra kỹ thông tin đăng ký trước ngày kiểm tra, nếu có sai sót vui lòng báo phòng Đào tạo để được hỗ trợ</span>.</li>
                     </ul>
                     
-                    <div className="mt-4 bg-white p-4 rounded-lg border border-orange-200 shadow-sm">
-                        <p className="text-sm text-slate-500 mb-2">Thông tin chuyển khoản:</p>
-                        <div className="flex flex-col md:flex-row gap-6">
-                            <div>
-                                <p className="text-xs text-slate-400 uppercase font-bold">Ngân hàng</p>
-                                <p className="font-bold text-blue-800">Agribank</p>
+                    <div className="bg-white p-4 rounded-lg border border-orange-200 shadow-sm">
+                        <p className="text-sm text-slate-500 mb-4 italic">Sử dụng ứng dụng Ngân hàng quét mã QR để thanh toán nhanh:</p>
+                        <div className="flex flex-col md:flex-row gap-6 items-center">
+                            {/* Cột mã QR */}
+                            <div className="flex-shrink-0 bg-white p-2 border border-slate-100 rounded-lg shadow-sm">
+                                <img src={qrData.url} alt="VietQR Agribank" className="w-40 h-40" />
                             </div>
-                            <div>
-                                <p className="text-xs text-slate-400 uppercase font-bold">Số tài khoản</p>
-                                <p className="font-bold text-slate-800 text-lg tracking-wider">52002055999999</p>
-                            </div>
-                            <div>
-                                <p className="text-xs text-slate-400 uppercase font-bold">Cú pháp chuyển khoản</p>
-                                <p className="font-bold text-red-600 bg-red-50 px-2 py-0.5 rounded border border-red-100">
-                                    {result.MaSV}_{result.RoundId}_{new Date(result.NgayThi).getFullYear()}
-                                </p>
+                            
+                            {/* Cột thông tin chữ */}
+                            <div className="flex-1 space-y-3">
+                                <div>
+                                    <p className="text-[10px] text-slate-400 uppercase font-bold">Ngân hàng nhận</p>
+                                    <p className="font-bold text-blue-800">Agribank</p>
+                                </div>
+                                <div>
+                                    <p className="text-[10px] text-slate-400 uppercase font-bold">Số tài khoản</p>
+                                    <p className="font-bold text-slate-800 text-lg">5200205598317</p>
+                                </div>
+                                <div>
+                                    <p className="text-[10px] text-slate-400 uppercase font-bold">Nội dung chuyển khoản</p>
+                                    <p className="font-bold text-red-600 bg-red-50 px-2 py-1 rounded border border-red-100 inline-block">
+                                        {qrData.content}
+                                    </p>
+                                </div>
                             </div>
                         </div>
                     </div>
                 </div>
             )}
 
-            {/* HIỂN THỊ ĐIỂM (Nếu có) */}
+            {/* HIỂN THỊ ĐIỂM (Giữ nguyên) */}
             {(result.total !== null && result.total !== undefined) && (
                  <div className="mt-6 pt-6 border-t border-slate-200">
                     <h3 className="font-bold text-slate-800 mb-4 text-center">KẾT QUẢ KIỂM TRA</h3>
