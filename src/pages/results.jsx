@@ -91,8 +91,8 @@ const Results = () => {
   const getQrData = () => {
     if (!result) return { content: '', url: '' };
     const year = result.NgayThi ? new Date(result.NgayThi).getFullYear() : new Date().getFullYear();
-    const content = `TA_${year}_${result.RoundId}_${result.MaSV}`;
-    const url = `https://img.vietqr.io/image/agribank-52002055999999-compact2.jpg?amount=${result.lephi}&addInfo=${encodeURIComponent(content)}&accountName=PHONG%20DAO%20TAO`;
+    const content = `NLTA ${year} ${result.RoundId} ${result.MaSV}`;
+    const url = `https://img.vietqr.io/image/agribank-5200205598317-compact2.jpg?amount=${result.lephi}&addInfo=${encodeURIComponent(content)}&accountName=PHONG%20DAO%20TAO`;
     return { content, url };
   };
 
@@ -185,11 +185,11 @@ const Results = () => {
                         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                             <div>
                                 <p className="text-[11px] text-slate-500 uppercase font-bold">Ngân hàng nhận</p>
-                                <p className="font-bold text-slate-800">Agribank - CN Hà Tây</p>
+                                <p className="font-bold text-slate-800">Agribank - CN Đắk Lắk</p>
                             </div>
                             <div>
                                 <p className="text-[11px] text-slate-500 uppercase font-bold">Số tài khoản</p>
-                                <p className="font-bold text-slate-800 text-lg">52002055999999</p>
+                                <p className="font-bold text-slate-800 text-lg">5200205598317</p>
                             </div>
                             <div>
                                 <p className="text-[11px] text-slate-500 uppercase font-bold">Số tiền</p>
