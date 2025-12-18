@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useState, useRef } from 'react';
 import * as XLSX from 'xlsx'; 
 import { 
   Search, 
@@ -13,7 +13,11 @@ import {
   X,
   Save,
   ListFilter,
-  AlertCircle
+  AlertCircle,
+  FileSpreadsheet,
+  Upload,
+  Database, // Thêm icon Database cho popup
+  Loader2    // Thêm icon loading
 } from 'lucide-react';
 
 // Import API
@@ -23,7 +27,8 @@ import {
   getRegistrationById,    
   updateRegistrationStatus,
   deleteRegistration,
-  changeRegistrationround // Đảm bảo hàm này đã được export trong api.js
+  changeRegistrationround,
+  importScoresFromExcel 
 } from '../../services/api.js';
 
 const Registrations = () => {
@@ -38,6 +43,13 @@ const Registrations = () => {
   // UI State
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
+  
+  // --- STATE MỚI CHO PROGRESS POPUP ---
+  const [uploading, setUploading] = useState(false);
+  const [importProgress, setImportProgress] = useState(0);
+
+  // Ref cho input file ẩn
+  const fileInputRef = useRef(null);
 
   // Modal Edit State
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
@@ -66,16 +78,11 @@ const Registrations = () => {
             roundList = res.data;
         }
 
-        // Sắp xếp giảm dần theo ngày thi
         roundList.sort((a, b) => new Date(b.NgayThi) - new Date(a.NgayThi));
-        
         setSessions(roundList);
 
-        // --- LOGIC TÌM ĐỢT THI MẶC ĐỊNH ---
         if (roundList.length > 0) {
-            // Tìm đợt active hoặc gần nhất
             let targetRound = roundList.find(r => r.TrangThai === 'active');
-            
             if (!targetRound) {
                 const now = new Date().getTime();
                 let minDiff = Infinity;
@@ -87,7 +94,6 @@ const Registrations = () => {
                     }
                 });
             }
-
             if (targetRound) {
                 const roundId = targetRound.id || targetRound.MaDot || targetRound._id;
                 setSelectedSession(String(roundId));
@@ -102,42 +108,86 @@ const Registrations = () => {
   }, []);
 
   // --- 2. FETCH ĐĂNG KÝ KHI ĐỢT THI THAY ĐỔI ---
-  useEffect(() => {
+  const fetchRegistrations = async () => {
     if (!selectedSession) return;
-
-    const fetchRegistrations = async () => {
-      setLoading(true);
-      setError('');
-      setRegistrations([]); 
+    setLoading(true);
+    setError('');
+    
+    try {
+      const res = await getRegistrationsByRound(selectedSession);
+      const rawList = Array.isArray(res) ? res : (res.data || []);
       
-      try {
-        const res = await getRegistrationsByRound(selectedSession);
-        const rawList = Array.isArray(res) ? res : (res.data || []);
-        
-        const safeRegs = rawList.map(r => ({
-            mssv: r.MaSV || r.mssv,
-            fullName: r.HoTen || r.fullName,
-            dob: r.NgaySinh || r.dob,
-            gender: r.GioiTinh || r.gender,
-            email: r.email || r.Email, 
-            phone: r.dienthoai || r.phone || r.DienThoai,
-            
-            roundId: r.RoundId || selectedSession,
-            roundName: r.TenDot || r.roundName, 
-            status: r.TrangThai || r.status || 'pending'
-        }));
+      const safeRegs = rawList.map(r => ({
+          mssv: r.MaSV || r.mssv,
+          fullName: r.HoTen || r.fullName,
+          dob: r.NgaySinh || r.dob,
+          gender: r.GioiTinh || r.gender,
+          email: r.email || r.Email, 
+          phone: r.dienthoai || r.phone || r.DienThoai,
+          roundId: r.RoundId || selectedSession,
+          roundName: r.TenDot || r.roundName, 
+          status: r.TrangThai || r.status || 'pending'
+      }));
 
-        setRegistrations(safeRegs);
-      } catch (err) {
-        console.error("Lỗi tải danh sách đăng ký:", err);
-        setError('Không thể tải dữ liệu đăng ký. Vui lòng thử lại.');
-      } finally {
-        setLoading(false);
-      }
-    };
+      setRegistrations(safeRegs);
+    } catch (err) {
+      console.error("Lỗi tải danh sách đăng ký:", err);
+      setError('Không thể tải dữ liệu đăng ký. Vui lòng thử lại.');
+    } finally {
+      setLoading(false);
+    }
+  };
 
+  useEffect(() => {
     fetchRegistrations();
   }, [selectedSession]);
+
+  // --- HANDLER NHẬP ĐIỂM EXCEL (CẬP NHẬT MỚI VỚI POPUP %) ---
+  const handleImportScores = async (e) => {
+    const file = e.target.files[0];
+    if (!file || !selectedSession) return;
+
+    if (!window.confirm(`Bạn có chắc chắn muốn cập nhật điểm cho đợt thi hiện tại từ file "${file.name}"?`)) {
+      e.target.value = null;
+      return;
+    }
+
+    setUploading(true);
+    setImportProgress(5); // Khởi đầu
+
+    try {
+      // Giả lập tiến độ chạy mượt mà lên 90%
+      const progressInterval = setInterval(() => {
+        setImportProgress(prev => {
+          if (prev >= 90) {
+            clearInterval(progressInterval);
+            return 90;
+          }
+          return prev + 2;
+        });
+      }, 200);
+
+      const res = await importScoresFromExcel(file, selectedSession);
+      
+      clearInterval(progressInterval);
+      setImportProgress(100); // Hoàn tất khi nhận được phản hồi từ server
+
+      // Đợi hiệu ứng thanh progress đạt 100% rồi đóng
+      setTimeout(() => {
+        setUploading(false);
+        setImportProgress(0);
+        alert(res.message || "Cập nhật điểm thành công!");
+        fetchRegistrations(); // Tải lại danh sách
+      }, 600);
+
+    } catch (err) {
+      setUploading(false);
+      setImportProgress(0);
+      alert("Lỗi nhập điểm: " + err.message);
+    } finally {
+      e.target.value = null; 
+    }
+  };
 
   // --- FILTER SEARCH ---
   const filteredRegistrations = useMemo(() => {
@@ -150,14 +200,10 @@ const Registrations = () => {
   }, [registrations, searchTerm]);
 
   // --- HANDLERS ---
-  
-  // Mở Modal Sửa
   const handleEditClick = async (item) => {
       try {
-          // Gọi API lấy chi tiết để có thông tin mới nhất
           const res = await getRegistrationById(item.mssv, selectedSession);
           let dataToEdit = { ...item };
-          
           if (res && res.data) {
              const d = res.data;
              dataToEdit = {
@@ -166,71 +212,45 @@ const Registrations = () => {
                  dob: d.NgaySinh || item.dob,
                  status: d.TrangThai || item.status,
                  roundName: d.TenDot || item.roundName,
-                 roundId: item.roundId, // ID đợt thi hiện tại
+                 roundId: item.roundId,
              };
           }
-          // Lưu lại ID đợt thi gốc để so sánh nếu có thay đổi
           dataToEdit.originalRoundId = item.roundId;
-          
           setEditingItem(dataToEdit);
           setIsEditModalOpen(true);
       } catch (err) {
-          console.error("Lỗi lấy chi tiết:", err);
-          // Fallback nếu API lỗi
           setEditingItem({ ...item, originalRoundId: item.roundId });
           setIsEditModalOpen(true);
       }
   };
 
-  // Lưu thay đổi (Trạng thái & Đợt thi)
   const handleSaveStatus = async () => {
       if (!editingItem) return;
-      
       const { mssv, roundId, originalRoundId, status } = editingItem;
-
       try {
-          // 1. Nếu thay đổi đợt thi -> Gọi API chuyển đợt
           if (String(roundId) !== String(originalRoundId)) {
               await changeRegistrationround(mssv, originalRoundId, roundId);
           }
-
-          // 2. Cập nhật trạng thái (Gọi API update status với roundId MỚI)
           await updateRegistrationStatus(mssv, roundId, status);
-          
           alert("Cập nhật thông tin thành công!");
           setIsEditModalOpen(false);
-
-          // 3. Cập nhật giao diện (Optimistic UI Update)
           setRegistrations(prev => {
-              // Nếu đợt thi MỚI khác với đợt thi đang chọn xem (selectedSession)
-              // -> Xóa sinh viên khỏi danh sách hiện tại
               if (String(roundId) !== String(selectedSession)) {
                   return prev.filter(item => item.mssv !== mssv);
               }
-
-              // Ngược lại, cập nhật thông tin tại chỗ
               return prev.map(item => {
                   if (item.mssv === mssv) {
-                      // Tìm tên đợt thi mới để hiển thị
                       const newRoundName = sessions.find(s => String(s.id || s.MaDot) === String(roundId))?.TenDot;
-                      return { 
-                          ...item, 
-                          status: status,
-                          roundId: roundId,
-                          roundName: newRoundName || item.roundName
-                      };
+                      return { ...item, status: status, roundId: roundId, roundName: newRoundName || item.roundName };
                   }
                   return item;
               });
           });
-
       } catch (err) {
-          console.error(err);
           alert("Lỗi cập nhật: " + (err.message || "Lỗi server"));
       }
   };
 
-  // Xóa đăng ký
   const handleDeleteClick = async (item) => {
       if(window.confirm(`Bạn chắc chắn muốn xóa đăng ký của ${item.fullName}?`)) {
           try {
@@ -243,10 +263,8 @@ const Registrations = () => {
       }
   };
 
-  // Xuất Excel
   const handleExport = () => {
       if (filteredRegistrations.length === 0) return alert("Không có dữ liệu để xuất");
-      
       const data = filteredRegistrations.map(r => ({
           'MSSV': r.mssv,
           'Họ tên': r.fullName,
@@ -256,9 +274,7 @@ const Registrations = () => {
           'Đợt thi': r.roundName,
           'Trạng thái': r.status === 'paid' ? 'Đã đóng phí' : 'Chưa đóng phí'
       }));
-
       const currentRoundName = sessions.find(s => String(s.id || s.MaDot) === String(selectedSession))?.TenDot || 'DanhSach';
-      
       const ws = XLSX.utils.json_to_sheet(data);
       const wb = XLSX.utils.book_new();
       XLSX.utils.book_append_sheet(wb, ws, "DS_DangKy");
@@ -289,20 +305,37 @@ const Registrations = () => {
             <h1 className="text-3xl font-bold">Quản lý danh sách đăng ký</h1>
             <p className="text-indigo-100 mt-1">Xem danh sách sinh viên theo từng đợt.</p>
           </div>
-          <button 
-             onClick={handleExport}
-             disabled={filteredRegistrations.length === 0}
-             className="flex items-center gap-2 rounded-xl bg-white/20 hover:bg-white/30 backdrop-blur-sm px-5 py-2.5 font-semibold text-white transition-all border border-white/30 shadow-sm disabled:opacity-50 disabled:cursor-not-allowed"
-          >
-             <Download size={18} /> Xuất Excel
-          </button>
+          
+          <div className="flex items-center gap-3">
+             <input 
+                type="file" 
+                ref={fileInputRef} 
+                onChange={handleImportScores} 
+                accept=".xlsx, .xls" 
+                className="hidden" 
+             />
+             <button 
+                onClick={() => fileInputRef.current.click()}
+                disabled={uploading || !selectedSession}
+                className="flex items-center gap-2 rounded-xl bg-orange-500 hover:bg-orange-600 px-5 py-2.5 font-semibold text-white transition-all shadow-sm disabled:opacity-50"
+             >
+                {uploading ? <Loader2 size={18} className="animate-spin" /> : <FileSpreadsheet size={18} />} 
+                {uploading ? 'Đang cập nhật...' : 'Nhập điểm Excel'}
+             </button>
+
+             <button 
+                onClick={handleExport}
+                disabled={filteredRegistrations.length === 0}
+                className="flex items-center gap-2 rounded-xl bg-white/20 hover:bg-white/30 backdrop-blur-sm px-5 py-2.5 font-semibold text-white transition-all border border-white/30 shadow-sm disabled:opacity-50 disabled:cursor-not-allowed"
+             >
+                <Download size={18} /> Xuất Excel
+             </button>
+          </div>
         </div>
       </div>
 
       {/* TOOLBAR */}
       <div className="flex flex-col md:flex-row gap-4 justify-between items-center bg-white p-5 rounded-2xl shadow-sm border border-slate-100">
-         
-         {/* SELECT ROUND */}
          <div className="flex items-center gap-3 w-full md:w-auto flex-1">
             <div className="flex items-center gap-2 text-slate-500 font-medium whitespace-nowrap">
                 <ListFilter size={20} />
@@ -322,7 +355,6 @@ const Registrations = () => {
             </select>
          </div>
 
-         {/* SEARCH LOCAL */}
          <div className="relative w-full md:w-80">
             <div className="absolute inset-y-0 left-0 flex items-center pl-3 pointer-events-none">
                 <Search className="h-5 w-5 text-slate-400" />
@@ -337,7 +369,6 @@ const Registrations = () => {
          </div>
       </div>
 
-      {/* ALERT ERROR */}
       {error && (
         <div className="rounded-xl bg-red-50 p-4 border border-red-200 text-red-700 flex items-center gap-2">
             <AlertCircle size={20} /> {error}
@@ -436,14 +467,41 @@ const Registrations = () => {
             </table>
         </div>
         
-        {/* Footer */}
         <div className="bg-slate-50 px-6 py-4 border-t border-slate-200 text-xs text-slate-500 flex justify-between items-center font-medium">
              <span>Hiển thị <span className="text-slate-900">{filteredRegistrations.length}</span> kết quả</span>
              <span>Tổng số: {registrations.length}</span>
         </div>
       </div>
 
-      {/* EDIT MODAL */}
+      {/* --- POPUP TIẾN ĐỘ NHẬP ĐIỂM (BỔ SUNG MỚI) --- */}
+      {uploading && (
+        <div className="fixed inset-0 z-[110] flex items-center justify-center bg-black/60 backdrop-blur-sm p-4 animate-fade-in">
+          <div className="w-full max-w-md rounded-3xl bg-white shadow-2xl p-8 text-center animate-zoom-in">
+            <div className="mb-5 flex justify-center">
+              <div className="p-4 bg-orange-100 rounded-full text-orange-600 animate-bounce">
+                <Database size={32} />
+              </div>
+            </div>
+            <h3 className="text-xl font-bold text-slate-800 mb-2">Đang xử lý dữ liệu Excel</h3>
+            <p className="text-slate-500 text-sm mb-6">Hệ thống đang đồng bộ dữ liệu điểm cho các sinh viên trong đợt thi này. Vui lòng không đóng trình duyệt.</p>
+            
+            {/* Progress Bar Container */}
+            <div className="w-full bg-slate-100 rounded-full h-4 mb-3 overflow-hidden">
+              <div 
+                className="bg-orange-500 h-full transition-all duration-300 ease-out"
+                style={{ width: `${importProgress}%` }}
+              ></div>
+            </div>
+            
+            <div className="flex justify-between items-center text-sm">
+              <span className="font-bold text-orange-600">{importProgress}%</span>
+              <span className="text-slate-400 italic">Đang cập nhật...</span>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* MODAL EDIT */}
       {isEditModalOpen && editingItem && (
          <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/50 backdrop-blur-sm p-4 animate-fade-in">
             <div className="w-full max-w-md rounded-2xl bg-white shadow-2xl overflow-hidden animate-zoom-in">
@@ -460,7 +518,6 @@ const Registrations = () => {
                         <p className="flex justify-between"><span>MSSV:</span> <span className="font-mono font-bold text-slate-500">{editingItem.mssv}</span></p>
                     </div>
 
-                    {/* Chọn Đợt Thi */}
                     <div>
                         <label className="block text-sm font-bold text-slate-700 mb-2">Đợt thi</label>
                         <select 
@@ -476,7 +533,6 @@ const Registrations = () => {
                         </select>
                     </div>
 
-                    {/* Chọn Trạng Thái */}
                     <div>
                         <label className="block text-sm font-bold text-slate-700 mb-2">Trạng thái lệ phí</label>
                         <select 

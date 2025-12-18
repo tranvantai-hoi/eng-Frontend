@@ -226,3 +226,24 @@ export const deleteAdminSession = (id) =>
       method: 'DELETE',
       headers: authHeaders(),
     });
+
+    //Nhập kết quả kiểm tra vào
+  export const importScoresFromExcel = async (file, roundId) => {
+      const formData = new FormData();
+      formData.append('file', file);
+      formData.append('roundId', roundId);
+    
+      // Lưu ý: Khi gửi FormData qua fetch, KHÔNG được set 'Content-Type' là 'application/json'.
+      // Trình duyệt sẽ tự động thiết lập Content-Type kèm theo boundary cho multipart/form-data.
+      const token = localStorage.getItem('exam_token');
+      const headers = {};
+      if (token) {
+        headers['Authorization'] = `Bearer ${token}`;
+      }
+    
+      return request('/registrations/import-scores', {
+        method: 'POST',
+        headers: headers, // Không dùng defaultHeaders() vì nó ép Content-Type: application/json
+        body: formData,
+      });
+    };
