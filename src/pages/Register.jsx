@@ -175,16 +175,13 @@ const Register = () => {
       }
   };
 
-  // Hàm xử lý chuyển bước / Hoàn tất
   const handleAction = async () => {
-    // --- STEP 1: TRA CỨU ---
     if (currentStep === 1) {
         if (!studentLoaded) return setError("Vui lòng tra cứu sinh viên trước.");
         setCurrentStep(2);
         return;
     }
 
-    // --- STEP 2: XÁC THỰC & CẬP NHẬT ---
     if (currentStep === 2) {
         if (!isEmailVerified) return setError("Vui lòng xác thực Email trước.");
         if (!formData.phone || formData.phone.trim() === "") return setError("Vui lòng nhập số điện thoại.");
@@ -198,10 +195,8 @@ const Register = () => {
                 email: formData.email.trim(),
                 phone: formData.phone.trim()
             });
-            console.log("Cập nhật thông tin liên hệ thành công!");
             setCurrentStep(3);
         } catch (err) {
-            console.error("Lỗi cập nhật:", err);
             setError(err.message || "Không thể lưu thông tin liên hệ.");
         } finally {
             setSubmitLoading(false);
@@ -209,7 +204,6 @@ const Register = () => {
         return;
     }
     
-    // --- STEP 3: ĐĂNG KÝ & CHUYỂN TRANG ---
     if (currentStep === 3) {
         if (!formData.sessionId) return setError("Vui lòng chọn một đợt kiểm tra."); 
         
@@ -231,7 +225,6 @@ const Register = () => {
 
             await registerForExam(payload);
             
-            // [QUAN TRỌNG] Chuyển trang và truyền MSSV, RoundId để bên Result tự load
             navigate('/results', { 
                 state: { 
                     autoFetch: true,
@@ -241,9 +234,7 @@ const Register = () => {
             });
             
         } catch (err) {
-            console.error("Lỗi đăng ký:", err);
             const msg = err.message || "";
-            // Nếu đã đăng ký rồi thì vẫn cho qua Result để xem thông tin cũ
             if (msg.includes('đã đăng ký') || msg.includes('already registered')) {
                  if(window.confirm("Bạn đã đăng ký đợt thi này rồi. Bạn có muốn xem lại thông tin đăng ký không?")) {
                     navigate('/results', { 
@@ -268,7 +259,6 @@ const Register = () => {
       setCurrentStep(prev => prev - 1);
   };
 
-  // --- VARIABLES HIỂN THỊ ---
   const selectedRound = activeRounds.find(r => String(r.id || r._id || r.MaDot) === String(formData.sessionId));
   const displayRoundName = selectedRound ? (selectedRound.name || selectedRound.TenDot || selectedRound.ten_dot || '') : '';
   const displayRoundDate = selectedRound ? formatDateDisplay(selectedRound.date || selectedRound.NgayThi || selectedRound.ngay_thi) : '';
@@ -280,13 +270,11 @@ const Register = () => {
     <div className="min-h-screen bg-slate-50 py-10 px-4 font-sans text-slate-800">
       <div className="max-w-4xl mx-auto">
         
-        {/* HEADER */}
         <div className="text-center mb-8">
           <h1 className="text-3xl font-bold text-blue-900 mb-2 uppercase tracking-wide">Đăng Ký Kiểm Tra Năng Lực Tiếng Anh</h1>
           <p className="text-slate-500">Hệ thống đăng ký trực tuyến</p>
         </div>
 
-        {/* STEPPER */}
         <div className="mb-8">
             <div className="flex justify-between items-center relative max-w-2xl mx-auto">
                 <div className="absolute top-1/2 left-0 w-full h-1 bg-slate-200 -z-10 rounded"></div>
@@ -315,7 +303,6 @@ const Register = () => {
             </div>
         </div>
 
-        {/* ERROR BOX */}
         {error && (
             <div className="mb-6 bg-red-50 border-l-4 border-red-500 p-4 rounded-r shadow-sm flex items-start animate-pulse">
                 <i className="fas fa-exclamation-circle text-red-500 mt-1 mr-3"></i>
@@ -328,7 +315,6 @@ const Register = () => {
 
         <div className="bg-white rounded-2xl shadow-xl overflow-hidden border border-slate-100 relative min-h-[400px]">
             
-            {/* --- BƯỚC 1: TRA CỨU --- */}
             {currentStep === 1 && (
                 <div className="p-8 animate-in fade-in slide-in-from-right-4 duration-500">
                     <h2 className="text-xl font-bold text-slate-800 mb-6 flex items-center">
@@ -336,14 +322,15 @@ const Register = () => {
                         Tra cứu thông tin sinh viên
                     </h2>
                     
-                    <div className="flex gap-3 items-end mb-6">
+                    {/* ĐÃ SỬA: Chuyển sang flex-col trên mobile để nút tra cứu không bị khuất */}
+                    <div className="flex flex-col sm:flex-row gap-3 items-stretch sm:items-end mb-6">
                         <div className="flex-1">
                             <Input label="Mã số sinh viên (MSSV)" name="mssv" value={formData.mssv} onChange={handleChange} required placeholder="Ví dụ: 20123456" />
                         </div>
                         <button 
                             onClick={handleLookup} 
                             disabled={loadingStudent || !formData.mssv}
-                            className="h-[42px] px-6 bg-blue-600 text-white font-bold rounded-lg hover:bg-blue-700 disabled:opacity-50 hover:shadow-lg transition-all min-w-[140px]"
+                            className="h-[42px] px-6 bg-blue-600 text-white font-bold rounded-lg hover:bg-blue-700 disabled:opacity-50 hover:shadow-lg transition-all"
                         >
                             {loadingStudent ? <><i className="fas fa-spinner fa-spin mr-2"></i> Đang tìm</> : 'Tra cứu'}
                         </button>
@@ -360,7 +347,6 @@ const Register = () => {
                 </div>
             )}
 
-            {/* --- BƯỚC 2: XÁC THỰC --- */}
             {currentStep === 2 && (
                 <div className="p-8 animate-in fade-in slide-in-from-right-4 duration-500">
                     <h2 className="text-xl font-bold text-slate-800 mb-6 flex items-center">
@@ -423,7 +409,6 @@ const Register = () => {
                 </div>
             )}
 
-            {/* --- BƯỚC 3: CHỌN ĐỢT KIỂM TRA & HOÀN TẤT --- */}
             {currentStep === 3 && (
                 <div className="p-8 animate-in fade-in slide-in-from-right-4 duration-500">
                     <h2 className="text-xl font-bold text-slate-800 mb-6 flex items-center">
@@ -484,7 +469,6 @@ const Register = () => {
                 </div>
             )}
 
-            {/* --- ACTION BUTTONS (Footer) --- */}
             <div className="bg-slate-50 px-8 py-4 border-t border-slate-200 flex justify-between items-center">
                 {currentStep > 1 ? (
                     <button onClick={prevStep} className="px-6 py-2 rounded-lg text-slate-600 font-bold hover:bg-slate-200 transition-colors">
@@ -492,7 +476,6 @@ const Register = () => {
                     </button>
                 ) : <div></div>}
 
-                {/* LOGIC NÚT ĐỔI: Bước 1,2 là Tiếp theo. Bước 3 là Hoàn tất */}
                 <button 
                     onClick={handleAction} 
                     disabled={submitLoading} 
