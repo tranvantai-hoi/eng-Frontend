@@ -78,12 +78,16 @@ const Register = () => {
              data = [res];
         }
 
+        // Backend trả về data có kèm isExpired, isFull theo logic isAvailable trong Model
         const validRounds = data.filter(r => r && (r.id || r._id || r.MaDot));
         setActiveRounds(validRounds);
 
+        // Chỉ tự động chọn nếu có 1 đợt duy nhất và đợt đó KHÔNG bị hết hạn/đầy
         if (validRounds.length === 1) {
             const r = validRounds[0];
-            setFormData(prev => ({ ...prev, sessionId: r.id || r._id || r.MaDot }));
+            if (!r.isExpired && !r.isFull) {
+                setFormData(prev => ({ ...prev, sessionId: r.id || r._id || r.MaDot }));
+            }
         }
 
       } catch (err) {
@@ -207,6 +211,17 @@ const Register = () => {
     if (currentStep === 3) {
         if (!formData.sessionId) return setError("Vui lòng chọn một đợt kiểm tra."); 
         
+        // Kiểm tra logic hạn chế đăng ký từ dữ liệu backend (đã cập nhật Model)
+        const round = activeRounds.find(r => String(r.id || r._id || r.MaDot) === String(formData.sessionId));
+        if (round) {
+            if (round.isExpired) {
+                return setError("Đợt này đã hết hạn đăng ký (Hệ thống đóng đăng ký trước ngày thi 7 ngày).");
+            }
+            if (round.isFull) {
+                return setError("Đợt này đã đủ số lượng sinh viên đăng ký.");
+            }
+        }
+
         setError('');
         setSubmitLoading(true); 
         
@@ -322,7 +337,7 @@ const Register = () => {
                         Tra cứu thông tin sinh viên
                     </h2>
                     
-                    {/* ĐÃ SỬA: Chuyển sang flex-col trên mobile để nút tra cứu không bị khuất */}
+                    {/* ĐÃ CHỈNH: flex-col cho mobile để nút không bị khuất */}
                     <div className="flex flex-col sm:flex-row gap-3 items-stretch sm:items-end mb-6">
                         <div className="flex-1">
                             <Input label="Mã số sinh viên (MSSV)" name="mssv" value={formData.mssv} onChange={handleChange} required placeholder="Ví dụ: 20123456" />
@@ -430,8 +445,13 @@ const Register = () => {
                                 >
                                     <option value="">-- Vui lòng chọn đợt kiểm tra --</option> 
                                     {activeRounds.map(round => (
-                                        <option key={round.id || round._id || round.MaDot} value={round.id || round._id || round.MaDot}>
-                                            {round.name || round.TenDot || round.ten_dot} (Ngày: {formatDateDisplay(round.date || round.NgayThi || round.ngay_thi)}) 
+                                        <option 
+                                            key={round.id || round._id || round.MaDot} 
+                                            value={round.id || round._id || round.MaDot}
+                                            disabled={round.isExpired || round.isFull}
+                                        >
+                                            {round.name || round.TenDot || round.ten_dot} 
+                                            {round.isExpired ? ' - (HẾT HẠN ĐĂNG KÝ)' : round.isFull ? ' - (ĐÃ ĐẦY)' : ` (Ngày: ${formatDateDisplay(round.date || round.NgayThi || round.ngay_thi)})`}
                                         </option>
                                     ))}
                                 </select>
@@ -440,23 +460,40 @@ const Register = () => {
                                 </div>
                             </div>
 
-                            {formData.sessionId && (
-                                <div className="mt-6 bg-blue-50 border border-blue-200 rounded-xl p-6 flex flex-col md:flex-row md:items-center justify-between gap-4">
-                                    <div>
-                                        <h4 className="font-bold text-blue-800 text-lg mb-1">
-                                            {displayRoundName}
-                                        </h4>
-                                        <p className="text-sm text-blue-600">
-                                            <i className="far fa-clock mr-2"></i>
-                                            Thời gian kiểm tra: <span className="font-bold">{displayRoundDate}</span>
-                                        </p>
-                                    </div>
-                                    <div className="bg-white px-4 py-2 rounded-lg shadow-sm text-center border border-blue-100">
-                                        <p className="text-xs text-slate-500 uppercase font-bold">Lệ phí</p> 
-                                        <p className="text-xl font-bold text-red-600">
-                                            {displayRoundFee} VNĐ
-                                        </p>
-                                    </div>
+                            {/* CẢNH BÁO CHI TIẾT */}
+                            {selectedRound && (
+                                <div className="mt-6">
+                                    {selectedRound.isExpired ? (
+                                        <div className="bg-red-50 border border-red-200 rounded-xl p-4 text-red-700 flex items-center">
+                                            <i className="fas fa-clock mr-3"></i>
+                                            <div>
+                                                <p className="font-bold">Đã đóng đăng ký</p>
+                                                <p className="text-sm">Hệ thống ngừng nhận hồ sơ trước ngày thi 7 ngày.</p>
+                                            </div>
+                                        </div>
+                                    ) : selectedRound.isFull ? (
+                                        <div className="bg-orange-50 border border-orange-200 rounded-xl p-4 text-orange-700 flex items-center">
+                                            <i className="fas fa-users-slash mr-3"></i>
+                                            <div>
+                                                <p className="font-bold">Đã đủ số lượng</p>
+                                                <p className="text-sm">Vui lòng chọn đợt thi khác hoặc liên hệ văn phòng.</p>
+                                            </div>
+                                        </div>
+                                    ) : (
+                                        <div className="bg-blue-50 border border-blue-200 rounded-xl p-6 flex flex-col md:flex-row md:items-center justify-between gap-4 animate-in fade-in zoom-in-95">
+                                            <div>
+                                                <h4 className="font-bold text-blue-800 text-lg mb-1">{displayRoundName}</h4>
+                                                <p className="text-sm text-blue-600">
+                                                    <i className="far fa-clock mr-2"></i>
+                                                    Thời gian kiểm tra: <span className="font-bold">{displayRoundDate}</span>
+                                                </p>
+                                            </div>
+                                            <div className="bg-white px-4 py-2 rounded-lg shadow-sm text-center border border-blue-100">
+                                                <p className="text-xs text-slate-500 uppercase font-bold">Lệ phí</p> 
+                                                <p className="text-xl font-bold text-red-600">{displayRoundFee} VNĐ</p>
+                                            </div>
+                                        </div>
+                                    )}
                                 </div>
                             )}
                         </div>

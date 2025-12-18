@@ -12,13 +12,16 @@ import {
   Mic,
   Headphones,
   BookOpen,
-  PenTool
+  PenTool,
+  XCircle
 } from 'lucide-react';
 
 // Import API
 import { getRegistrationById, getActiveExamRound } from '../services/api.js';
 
 const Results = () => {
+  const location = useLocation(); 
+  
   const [studentId, setStudentId] = useState('');
   const [selectedRoundId, setSelectedRoundId] = useState('');
   const [activeRounds, setActiveRounds] = useState([]);
@@ -26,39 +29,35 @@ const Results = () => {
   const [result, setResult] = useState(null);
   const [error, setError] = useState('');
 
-  // 1. Load danh sách đợt thi
   useEffect(() => {
-    const fetchRounds = async () => {
+    const fetchInitialData = async () => {
       try {
-        const res = await getActiveExamRound();
-        const data = Array.isArray(res) ? res : (res.data || []);
-        const validRounds = data.filter(r => r && (r.id || r.MaDot));
+        const resRounds = await getActiveExamRound();
+        const dataRounds = Array.isArray(resRounds) ? resRounds : (resRounds.data || []);
+        const validRounds = dataRounds.filter(r => r && (r.id || r.MaDot));
         setActiveRounds(validRounds);
         
-        if (validRounds.length === 1) {
+        if (location.state?.autoFetch && location.state?.mssv && location.state?.roundId) {
+            const { mssv, roundId } = location.state;
+            setStudentId(mssv);
+            setSelectedRoundId(roundId);
+            performSearch(mssv, roundId);
+        } else if (validRounds.length === 1) {
              setSelectedRoundId(validRounds[0].id || validRounds[0].MaDot);
         }
       } catch (err) {
-        console.error("Lỗi tải đợt thi:", err);
+        console.error("Lỗi tải dữ liệu ban đầu:", err);
       }
     };
-    fetchRounds();
-  }, []);
+    fetchInitialData();
+  }, [location.state]);
 
-  // 2. Xử lý tra cứu
-  const handleSearch = async (e) => {
-    if (e) e.preventDefault();
-    if (!studentId || !selectedRoundId) {
-      setError('Vui lòng nhập MSSV và chọn đợt thi');
-      return;
-    }
-
+  const performSearch = async (mssv, roundId) => {
     setLoading(true);
     setError('');
     setResult(null);
-
     try {
-      const res = await getRegistrationById(studentId, selectedRoundId);
+      const res = await getRegistrationById(mssv, roundId);
       if (res && res.data) {
         setResult(res.data);
       } else {
@@ -71,7 +70,15 @@ const Results = () => {
     }
   };
 
-  // Helper formats
+  const handleSearch = (e) => {
+    if (e) e.preventDefault();
+    if (!studentId || !selectedRoundId) {
+      setError('Vui lòng nhập MSSV và chọn đợt thi');
+      return;
+    }
+    performSearch(studentId, selectedRoundId);
+  };
+
   const formatDate = (dateStr) => {
     if (!dateStr) return '---';
     return new Date(dateStr).toLocaleDateString('vi-VN');
@@ -81,7 +88,6 @@ const Results = () => {
     return new Intl.NumberFormat('vi-VN', { style: 'currency', currency: 'VND' }).format(amount || 0);
   };
 
-  // Logic tạo dữ liệu QR Agribank
   const getQrData = () => {
     if (!result) return { content: '', url: '' };
     const year = result.NgayThi ? new Date(result.NgayThi).getFullYear() : new Date().getFullYear();
@@ -100,7 +106,6 @@ const Results = () => {
         <h1 className="text-3xl font-bold text-slate-900">Tra cứu kết quả kiểm tra</h1>
       </div>
 
-      {/* Form tìm kiếm */}
       <div className="bg-white rounded-3xl shadow-xl p-6 border border-slate-100">
         <form onSubmit={handleSearch} className="grid grid-cols-1 md:grid-cols-3 gap-4">
           <div>
@@ -137,7 +142,6 @@ const Results = () => {
 
       {result && (
         <div className="space-y-6 animate-fade-in-up">
-          {/* Thông tin cơ bản */}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             <div className="bg-white p-6 rounded-3xl border border-slate-100 shadow-sm">
               <h3 className="text-sm font-bold text-slate-400 uppercase mb-4 flex items-center gap-2"><User size={16}/> Thông tin thí sinh</h3>
@@ -157,35 +161,7 @@ const Results = () => {
             </div>
           </div>
 
-          {/* KẾT QUẢ KIỂM TRA */}
-          <div className="bg-gradient-to-br from-indigo-600 to-blue-700 rounded-3xl p-1 shadow-xl">
-            <div className="bg-white rounded-[22px] p-6">
-              <h3 className="text-lg font-bold text-slate-800 mb-6 flex items-center gap-2">
-                <Trophy className="text-orange-500" size={22} /> Kết quả kiểm tra
-              </h3>
-
-              {!hasScores ? (
-                <div className="py-8 text-center bg-slate-50 rounded-2xl border border-dashed border-slate-200">
-                  <p className="text-slate-500 font-medium italic">Hiện chưa có kết quả kiểm tra cho sinh viên này.</p>
-                </div>
-              ) : (
-                <div className="space-y-6">
-                  <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                    <ScoreCard icon={<Headphones size={18}/>} label="Nghe" score={result.nghe} color="blue" />
-                    <ScoreCard icon={<Mic size={18}/>} label="Nói" score={result.noi} color="purple" />
-                    <ScoreCard icon={<BookOpen size={18}/>} label="Đọc" score={result.doc} color="emerald" />
-                    <ScoreCard icon={<PenTool size={18}/>} label="Viết" score={result.viet} color="orange" />
-                  </div>
-                  <div className="p-4 bg-slate-50 rounded-2xl flex justify-between items-center border border-slate-100">
-                    <span className="text-sm font-bold text-slate-500 uppercase">Kết quả / Xếp loại:</span>
-                    <span className="text-xl font-black text-blue-700 uppercase">{result.ketqua || 'Đang cập nhật'}</span>
-                  </div>
-                </div>
-              )}
-            </div>
-          </div>
-
-          {/* PHẦN THANH TOÁN (Logic: Nếu chưa đóng hiện QR, đã đóng hiện thông báo) */}
+          {/* PHẦN TRẠNG THÁI THANH TOÁN / LỆ PHÍ */}
           {isPaid ? (
             <div className="bg-emerald-50 p-6 rounded-3xl border border-emerald-200 flex items-center justify-center gap-3 animate-fade-in shadow-sm">
                <CheckCircle2 className="text-emerald-600" size={28} />
@@ -195,13 +171,15 @@ const Results = () => {
             </div>
           ) : (
             <div className="bg-orange-50 rounded-3xl p-6 border border-orange-200 shadow-sm animate-fade-in">
-                <h3 className="text-orange-800 font-bold mb-4 flex items-center gap-2">
-                  <CreditCard size={20} /> HƯỚNG DẪN THANH TOÁN QUA QRCODE
-                </h3>
+                <div className="flex items-center gap-2 text-orange-800 font-bold mb-4">
+                  <XCircle className="text-red-500" size={24} />
+                  <h3 className="uppercase tracking-wide">Chưa hoàn tất đóng lệ phí</h3>
+                </div>
+                
                 <div className="flex flex-col md:flex-row gap-6 items-center">
                     <div className="flex-shrink-0 bg-white p-3 border border-orange-200 rounded-2xl shadow-sm text-center">
                         <img src={qrData.url} alt="VietQR Agribank" className="w-48 h-48 mx-auto" />
-                        <p className="text-[10px] text-slate-400 mt-2 italic">Dùng App Ngân hàng quét mã</p>
+                        <p className="text-[10px] text-slate-400 mt-2 italic">Dùng App Ngân hàng quét mã để thanh toán</p>
                     </div>
                     <div className="flex-1 space-y-4">
                         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
@@ -228,6 +206,34 @@ const Results = () => {
                 </div>
             </div>
           )}
+
+          {/* PHẦN KẾT QUẢ KIỂM TRA (HIỂN THỊ DƯỚI LỆ PHÍ) */}
+          <div className="bg-gradient-to-br from-indigo-600 to-blue-700 rounded-3xl p-1 shadow-xl">
+            <div className="bg-white rounded-[22px] p-6">
+              <h3 className="text-lg font-bold text-slate-800 mb-6 flex items-center gap-2">
+                <Trophy className="text-orange-500" size={22} /> Kết quả kiểm tra
+              </h3>
+
+              {!hasScores ? (
+                <div className="py-8 text-center bg-slate-50 rounded-2xl border border-dashed border-slate-200">
+                  <p className="text-slate-500 font-medium italic">Hiện chưa có kết quả kiểm tra cho sinh viên này.</p>
+                </div>
+              ) : (
+                <div className="space-y-6">
+                  <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                    <ScoreCard icon={<Headphones size={18}/>} label="Nghe" score={result.nghe} color="blue" />
+                    <ScoreCard icon={<Mic size={18}/>} label="Nói" score={result.noi} color="purple" />
+                    <ScoreCard icon={<BookOpen size={18}/>} label="Đọc" score={result.doc} color="emerald" />
+                    <ScoreCard icon={<PenTool size={18}/>} label="Viết" score={result.viet} color="orange" />
+                  </div>
+                  <div className="p-4 bg-slate-50 rounded-2xl flex justify-between items-center border border-slate-100">
+                    <span className="text-sm font-bold text-slate-500 uppercase">Kết quả / Xếp loại:</span>
+                    <span className="text-xl font-black text-blue-700 uppercase">{result.ketqua || 'Đang cập nhật'}</span>
+                  </div>
+                </div>
+              )}
+            </div>
+          </div>
         </div>
       )}
 
@@ -240,7 +246,6 @@ const Results = () => {
   );
 };
 
-// Components bổ trợ
 const InfoRow = ({ label, value, bold = false }) => (
   <div className="flex justify-between items-center py-1 border-b border-slate-50 last:border-0">
     <span className="text-sm text-slate-500">{label}:</span>
