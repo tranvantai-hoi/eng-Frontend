@@ -17,7 +17,7 @@ import {
 } from 'lucide-react';
 
 // Import API
-import { getRegistrationById, getActiveExamRound } from '../services/api.js';
+import { getRegistrationById, getActiveExamRound, getAdminSessions } from '../services/api.js';
 
 const Results = () => {
   const location = useLocation(); 
@@ -32,7 +32,7 @@ const Results = () => {
   useEffect(() => {
     const fetchInitialData = async () => {
       try {
-        const resRounds = await getActiveExamRound();
+        const resRounds = await getAdminSessions();
         const dataRounds = Array.isArray(resRounds) ? resRounds : (resRounds.data || []);
         const validRounds = dataRounds.filter(r => r && (r.id || r.MaDot));
         setActiveRounds(validRounds);

@@ -96,6 +96,7 @@ export const getActiveExamRound = () =>
     headers: defaultHeaders(),
   });
 
+
 export const createOtp = (payload) =>
   request('/otp/create-otp', {
     method: 'POST',
